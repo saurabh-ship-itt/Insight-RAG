@@ -1,0 +1,3101 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  Sparkles,
+  Download,
+  Cpu,
+  Zap,
+  Bot,
+  Send,
+  Trash2,
+  X,
+  Layers,
+  HardDrive,
+  BookOpen,
+  ExternalLink,
+  Copy,
+  Check,
+  RotateCcw,
+  User,
+  MessageSquarePlus,
+  ArrowLeft,
+  ArrowRight,
+  ArrowDown,
+  Eye,
+  CheckCheck,
+  RefreshCw,
+  SlidersHorizontal,
+  ShieldCheck,
+  Shield,
+  Info,
+  Lock,
+  Monitor,
+  Brain,
+  Scale,
+  AlertTriangle,
+  Camera,
+  Image as ImageIcon,
+  Terminal,
+  Square,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  Settings2,
+  Sliders,
+} from "lucide-react";
+import {
+  uploadRAGDocuments,
+  getRAGTaskStatus,
+  type RAGTaskStatus,
+  queryRAG,
+  streamRAGQuery,
+  getRAGStats,
+  clearRAGKnowledgeBase,
+  deleteRAGDocument,
+  getSystemSpecs,
+  setHardwareMode,
+  pullModel,
+  streamPullModel,
+  listInstalledModels,
+  checkBackendHealth,
+} from "../services/api";
+import { FormattedMarkdown } from "../components/FormattedMarkdown";
+
+export const Route = createFileRoute("/app/upload")({
+  head: () => ({
+    meta: [{ title: "InsightRAG" }],
+  }),
+  component: KnowledgeBaseStudioPage,
+});
+
+const EMBEDDING_OPTIONS = [
+  {
+    id: "all-MiniLM-L6-v2",
+    label: "all-MiniLM-L6-v2",
+    fullName: "sentence-transformers/all-MiniLM-L6-v2",
+    speedTier: "ULTRA-FAST (5x)",
+    speedBadgeColor: "bg-emerald-400 text-black",
+    ramReq: "4GB+ RAM (80MB Model)",
+    hardwareLabel: "CPU & Laptop Friendly",
+    dim: "384-dim",
+    desc: "Lightest & fastest. Zero lag on laptops and multi-core CPUs. Ideal for notes, summaries & rapid PDF indexing.",
+  },
+  {
+    id: "bge-small-en-v1.5",
+    label: "bge-small-en-v1.5",
+    fullName: "BAAI/bge-small-en-v1.5",
+    speedTier: "BALANCED (3x)",
+    speedBadgeColor: "bg-sky-400 text-black",
+    ramReq: "6GB+ RAM (130MB Model)",
+    hardwareLabel: "Standard Workstations",
+    dim: "384-dim",
+    desc: "Optimal balance of low latency and sharp semantic retrieval across standard PDFs, Word documents & EMR records.",
+  },
+  {
+    id: "bge-base-en-v1.5",
+    label: "bge-base-en-v1.5",
+    fullName: "BAAI/bge-base-en-v1.5",
+    speedTier: "SOTA HIGH PRECISION",
+    speedBadgeColor: "bg-[#ffe600] text-black",
+    ramReq: "8GB-16GB RAM / GPU (430MB Model)",
+    hardwareLabel: "High-Accuracy Research",
+    dim: "768-dim",
+    desc: "Industry benchmark for retrieval depth. Recommended for clinical guidelines, dense research papers & textbooks.",
+  },
+  {
+    id: "nomic-embed-text",
+    label: "nomic-embed-text",
+    fullName: "nomic-embed-text",
+    speedTier: "OLLAMA NATIVE 8K",
+    speedBadgeColor: "bg-purple-400 text-black",
+    ramReq: "8GB+ RAM (270MB Model)",
+    hardwareLabel: "Ollama Long-Context",
+    dim: "768-dim (8192 context)",
+    desc: "100% on-device Ollama native pipeline. Supports massive document chunks up to 8192 tokens per vector.",
+  },
+];
+
+export interface CuratedModel {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  size: string;
+  category: "multimodal" | "reasoning" | "fast" | "code" | "standard";
+  badge: string;
+  badgeColor: string;
+  isVisionCapable?: boolean;
+}
+
+export const CURATED_MODELS: CuratedModel[] = [
+  {
+    id: "qwen2.5vl:3b",
+    name: "Qwen 2.5 Vision 3B",
+    tagline: "Multimodal Vision, OCR & Visual QA SOTA",
+    description:
+      "Deep visual reasoning for document diagrams, figures, flowchart OCR, architecture schematics and tables.",
+    size: "3.2 GB",
+    category: "multimodal",
+    badge: "VISION & OCR SOTA",
+    badgeColor: "bg-purple-400 text-black",
+    isVisionCapable: true,
+  },
+  {
+    id: "llama3.2:3b",
+    name: "Llama 3.2 3B",
+    tagline: "Ultra-Fast Meta Lightweight Architecture",
+    description:
+      "Engineered for instantaneous local generation, dense semantic synthesis, and zero-latency Q&A.",
+    size: "2.0 GB",
+    category: "fast",
+    badge: "FAST & EFFICIENT",
+    badgeColor: "bg-emerald-400 text-black",
+  },
+  {
+    id: "qwen2.5:3b",
+    name: "Qwen 2.5 3B",
+    tagline: "Alibaba High-Reasoning & Code SOTA",
+    description:
+      "Unmatched coding precision, mathematical derivation, and structured reasoning in compact size.",
+    size: "1.9 GB",
+    category: "reasoning",
+    badge: "REASONING & CODE",
+    badgeColor: "bg-[#ffe600] text-black",
+  },
+  {
+    id: "deepseek-r1:1.5b",
+    name: "DeepSeek R1 1.5B",
+    tagline: "Open-Source Chain-of-Thought Reasoning",
+    description:
+      "Deep step-by-step thinking process, ideal for complex logic, root-cause queries, and analytical breakdown.",
+    size: "1.1 GB",
+    category: "reasoning",
+    badge: "REASONING ENGINE",
+    badgeColor: "bg-sky-400 text-black",
+  },
+  {
+    id: "phi3.5:3.8b",
+    name: "Phi 3.5 Mini 3.8B",
+    tagline: "Microsoft 128k Long-Context Powerhouse",
+    description:
+      "Massive 128,000 token context window support. Perfect for cross-document synthesis and long manuals.",
+    size: "2.2 GB",
+    category: "standard",
+    badge: "128K LONG-CONTEXT",
+    badgeColor: "bg-amber-400 text-black",
+  },
+  {
+    id: "mistral:7b",
+    name: "Mistral 7B Instruct",
+    tagline: "Industry Standard Analytical Accuracy",
+    description:
+      "High-parameter density instruction tuned model with superior prose quality and nuanced fact retrieval.",
+    size: "4.1 GB",
+    category: "standard",
+    badge: "HEAVYWEIGHT SOTA",
+    badgeColor: "bg-pink-400 text-black",
+  },
+];
+
+const PARSING_STAGES = [
+  {
+    step: 0,
+    title: "Document Buffer & Format Validation",
+    desc: "Validating file headers (PDF/DOCX/Images), parsing byte streams & initializing on-device memory pipelines.",
+    icon: "01",
+  },
+  {
+    step: 1,
+    title: "Deep Page Rasterization & Scanned Text OCR",
+    desc: "Extracting complete native typography, boundary coordinates, and running high-res OCR on scanned text.",
+    icon: "02",
+  },
+  {
+    step: 2,
+    title: "Tabular Structure Extraction & Grid Conversion",
+    desc: "Detecting tables via PyMuPDF find_tables and converting them into clean structured Markdown grids.",
+    icon: "03",
+  },
+  {
+    step: 3,
+    title: "Computer Vision & Diagram Edge Inspection",
+    desc: "Extracting embedded figures, computing Sobel edge density, and classifying charts, plots, and schematics.",
+    icon: "04",
+  },
+  {
+    step: 4,
+    title: "Multimodal Contextualization & Figure Captioning",
+    desc: "Associating nearby captions with diagrams and generating ROI coordinates for high-res visual retrieval.",
+    icon: "05",
+  },
+  {
+    step: 5,
+    title: "Semantic Chunking & FAISS Vector Indexing",
+    desc: "Compiling text and visual chunks into dense vector embeddings and persisting to the FAISS index.",
+    icon: "06",
+  },
+];
+
+function KnowledgeBaseStudioPage() {
+  // System & hardware acceleration state
+  const [specs, setSpecs] = useState<any>({
+    cpu_threads: 0,
+    ram_gb: 0,
+    gpu_name: "Detecting Engine...",
+    vram_gb: 0.0,
+    has_gpu: false,
+    has_gpu_access: false,
+    acceleration_mode: "LOCAL ENGINE",
+    installed_models: [],
+  });
+  const [activeHardwareMode, setActiveHardwareMode] = useState<"cpu" | "gpu">("cpu");
+  const [switchingHardware, setSwitchingHardware] = useState(false);
+  const [hardwareNotice, setHardwareNotice] = useState<string | null>(null);
+
+  // Model selection & engine configuration
+  const [selectedLLM, setSelectedLLM] = useState<string>(() => {
+    try {
+      return localStorage.getItem("insightrag_selected_model") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [sessionLifetime, setSessionLifetime] = useState("3 Hours");
+  const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
+  const [visionOCR, setVisionOCR] = useState(true);
+  const [selectedVisionModel, setSelectedVisionModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem("insightrag_vision_model") || "moondream:latest";
+    } catch {
+      return "moondream:latest";
+    }
+  });
+  const [processingMode, setProcessingMode] = useState("local");
+  const [cloudApiKey, setCloudApiKey] = useState("");
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
+  // Model hub & downloads
+  const [pullingModelId, setPullingModelId] = useState<string | null>(null);
+  const [pullProgress, setPullProgress] = useState<Record<string, number>>({});
+  const [pullStatusText, setPullStatusText] = useState<Record<string, string>>({});
+  const [switchToast, setSwitchToast] = useState<string | null>(null);
+  const [showModelHubModal, setShowModelHubModal] = useState<boolean>(false);
+  const [showModal, setShowModal] = useState(false);
+  const [customModel, setCustomModel] = useState("llama3.2:3b");
+  const [pulling, setPulling] = useState(false);
+  const [pullStatus, setPullStatus] = useState("");
+
+  // Upload, document ingestion & views
+  const [drag, setDrag] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [ragStats, setRagStats] = useState<any>({ total_vectors: 0, files: [] });
+  const [deletingDocName, setDeletingDocName] = useState<string | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+  const [copiedInstall, setCopiedInstall] = useState(false);
+  const [activeView, setActiveView] = useState<"upload" | "processing" | "chat">("upload");
+  const [processingStep, setProcessingStep] = useState<number>(0);
+  const [currentUploadingFiles, setCurrentUploadingFiles] = useState<string[]>([]);
+  const [usePageRange, setUsePageRange] = useState(false);
+  const [startPage, setStartPage] = useState<number | "">(1);
+  const [endPage, setEndPage] = useState<number | "">("");
+
+  // Chat conversation & stream state
+  const [query, setQuery] = useState("");
+  const [chatMessages, setChatMessages] = useState<
+    Array<{
+      role: "user" | "assistant";
+      text: string;
+      sources?: any[];
+      visual_snippet?: any;
+      visual_diagrams?: any[];
+      model?: string;
+      timestamp?: string;
+    }>
+  >(() => {
+    try {
+      const saved = localStorage.getItem("insightrag_chat_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [querying, setQuerying] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
+  const [editingMsgIdx, setEditingMsgIdx] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const [userScrolledUp, setUserScrolledUp] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    // Keep bottom lock if within 80px of bottom, otherwise pause auto-scroll
+    const atBottom = scrollHeight - scrollTop - clientHeight < 80;
+    isAtBottomRef.current = atBottom;
+    setUserScrolledUp(!atBottom);
+  };
+
+  // Sync chat history to localStorage and conditionally auto-scroll if locked to bottom
+  useEffect(() => {
+    try {
+      localStorage.setItem("insightrag_chat_history", JSON.stringify(chatMessages));
+    } catch (e) {
+      console.warn("Failed saving chat history to localStorage", e);
+    }
+    if (isAtBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, querying]);
+
+  // Initial load of hardware specs and knowledge base statistics with live background sync
+  useEffect(() => {
+    loadSpecsAndStats();
+    const interval = setInterval(() => {
+      loadSpecsAndStats();
+    }, 6000);
+
+    const onFocus = () => loadSpecsAndStats();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  const loadSpecsAndStats = async () => {
+    try {
+      const data = await getSystemSpecs();
+      if (data && (data.cpu_threads || data.gpu_name)) {
+        setSpecs(data);
+        if (data.has_gpu_access) {
+          setActiveHardwareMode(data.active_mode || "gpu");
+        } else {
+          setActiveHardwareMode("cpu");
+        }
+        setBackendOnline(true);
+
+        // Auto-detect and auto-select available Ollama models
+        const installed: string[] = Array.isArray(data.installed_models) ? data.installed_models : [];
+        if (installed.length > 0) {
+          setSelectedLLM((prev) => {
+            const isInstalled = prev && installed.some((m) => m === prev || m.toLowerCase() === prev.toLowerCase() || m.toLowerCase().includes(prev.toLowerCase()));
+            if (!isInstalled) {
+              const preferred = installed.find((m) =>
+                ["qwen", "llama", "mistral", "phi", "gemma"].some((kw) => m.toLowerCase().includes(kw) && !m.toLowerCase().includes("vision") && !m.toLowerCase().includes("vl"))
+              ) || installed[0];
+
+              try {
+                localStorage.setItem("insightrag_selected_model", preferred);
+              } catch {}
+              if (prev && prev !== preferred) {
+                setSwitchToast(`✨ Local model auto-detected and connected: ${preferred}`);
+                setTimeout(() => setSwitchToast(null), 4500);
+              }
+              return preferred;
+            }
+            return prev;
+          });
+        }
+      } else {
+        setBackendOnline(false);
+      }
+      const stats = await getRAGStats();
+      if (stats) setRagStats(stats);
+    } catch (err) {
+      console.warn("Local backend check failed:", err);
+      setBackendOnline(false);
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
+  const handleSwitchHardware = async (targetMode: "cpu" | "gpu") => {
+    if (targetMode === activeHardwareMode || switchingHardware) return;
+    if (targetMode === "gpu" && !specs.has_gpu_access) {
+      setHardwareNotice(
+        `Cannot switch to GPU: ${specs.gpu_disabled_reason || "No compatible CUDA/ROCm GPU available on this laptop."}`,
+      );
+      setTimeout(() => setHardwareNotice(null), 6000);
+      return;
+    }
+
+    setSwitchingHardware(true);
+    try {
+      await setHardwareMode(targetMode);
+      setActiveHardwareMode(targetMode);
+      setSpecs((prev: any) => ({
+        ...prev,
+        acceleration_mode: targetMode === "gpu" ? "GPU AUTO-ACCELERATED" : "CPU PARALLEL ENGINE",
+        active_mode: targetMode,
+      }));
+      setHardwareNotice(
+        targetMode === "gpu"
+          ? `Shifted to GPU Acceleration! Ollama layers and embeddings accelerated on ${specs.gpu_name}.`
+          : `Shifted to CPU Standard! 100% CPU multi-threaded parallel execution active.`,
+      );
+      setTimeout(() => setHardwareNotice(null), 7000);
+    } catch (err: any) {
+      setHardwareNotice(`Failed to switch hardware mode: ${err?.message || "Error"}`);
+      setTimeout(() => setHardwareNotice(null), 5000);
+    } finally {
+      setSwitchingHardware(false);
+    }
+  };
+
+  // When files are picked/dropped -> Open the interactive page range & confirmation modal
+  const onSelectFiles = (selected: FileList | null) => {
+    if (!selected || selected.length === 0) return;
+    const fileArray = Array.from(selected);
+    setPendingFiles(fileArray);
+    setUsePageRange(false);
+    setStartPage(1);
+    setEndPage("");
+    setShowUploadModal(true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Execute upload after user confirms page range in modal
+  const handleConfirmUpload = async () => {
+    if (pendingFiles.length === 0) return;
+    setShowUploadModal(false);
+    const filesToUpload = [...pendingFiles];
+    setFiles(filesToUpload);
+    await startUpload(filesToUpload);
+  };
+
+  const startUpload = async (fileList: File[]) => {
+    if (backendOnline === false) {
+      setUploadStatusMsg(
+        "Local RAG Engine is offline. InsightRAG is 100% on-device for total privacy — please launch the engine via run.bat or install.ps1 before uploading files.",
+      );
+      return;
+    }
+
+    setActiveView("processing");
+    setProcessingStep(0);
+    setCurrentUploadingFiles(fileList.map((f) => f.name));
+    setUploading(true);
+    setUploadProgress(5);
+    setUploadStatusMsg(null);
+
+    try {
+      const sPage =
+        usePageRange && typeof startPage === "number" && startPage > 0 ? startPage : undefined;
+      const ePage =
+        usePageRange && typeof endPage === "number" && endPage > 0 ? endPage : undefined;
+
+      const res = await uploadRAGDocuments(fileList, sPage, ePage);
+      const rangeNotice = sPage || ePage ? ` [Pages ${sPage || 1} to ${ePage || "End"}]` : "";
+
+      if (res?.task_id) {
+        // Asynchronous background ingestion — poll real status from backend
+        const taskId = res.task_id;
+        let isDone = false;
+
+        while (!isDone) {
+          await new Promise((r) => setTimeout(r, 500));
+          try {
+            const statusData: RAGTaskStatus = await getRAGTaskStatus(taskId);
+
+            if (typeof statusData.step === "number") {
+              setProcessingStep(statusData.step);
+            }
+            if (typeof statusData.progress === "number") {
+              setUploadProgress(statusData.progress);
+            }
+
+            if (statusData.status === "completed") {
+              isDone = true;
+              setProcessingStep(5);
+              setUploadProgress(100);
+              setUploadStatusMsg(
+                statusData.message ||
+                  `Successfully indexed ${statusData.documents_ingested || fileList.length} document(s)${rangeNotice} (${statusData.chunks_created || 0} chunks)!`,
+              );
+              await loadSpecsAndStats();
+
+              setTimeout(() => {
+                setUploading(false);
+                setActiveView("chat");
+                setUploadProgress(0);
+                setTimeout(() => {
+                  chatInputRef.current?.focus();
+                }, 300);
+              }, 900);
+              return;
+            }
+
+            if (statusData.status === "failed") {
+              isDone = true;
+              setUploading(false);
+              setUploadProgress(0);
+              setActiveView("upload");
+              setUploadStatusMsg(
+                `Ingestion failed: ${statusData.error_message || statusData.message || "Unknown error during parsing"}`,
+              );
+              await loadSpecsAndStats();
+              return;
+            }
+          } catch (pollErr: any) {
+            console.warn("Status poll error:", pollErr);
+          }
+        }
+      } else {
+        // Synchronous / legacy fallback response
+        setProcessingStep(5);
+        setUploadProgress(100);
+        setUploadStatusMsg(
+          `Successfully indexed ${res?.documents_ingested || fileList.length} document(s)${rangeNotice} (${res?.chunks_created || 0} chunks)!`,
+        );
+        await loadSpecsAndStats();
+
+        setTimeout(() => {
+          setUploading(false);
+          setActiveView("chat");
+          setUploadProgress(0);
+          setTimeout(() => {
+            chatInputRef.current?.focus();
+          }, 300);
+        }, 900);
+      }
+    } catch (err: any) {
+      setUploading(false);
+      setUploadProgress(0);
+      setActiveView("upload");
+      setBackendOnline(false);
+      const isNetErr =
+        err?.message?.includes("Network Error") ||
+        err?.code === "ERR_NETWORK" ||
+        err?.message?.includes("Failed to fetch");
+      const errMsg = isNetErr
+        ? "Backend connection failed. InsightRAG runs 100% locally on your machine for zero-cloud privacy. Please ensure the backend is running via run.bat or install.ps1."
+        : err?.response?.data?.detail || err?.message || "Failed to process files";
+      setUploadStatusMsg(`Upload error: ${errMsg}`);
+      loadSpecsAndStats();
+    }
+  };
+
+  const handleDeleteSingleDoc = async (docName: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to remove '${docName}' from the knowledge base? Vector index will be recalculated.`,
+      )
+    )
+      return;
+    setDeletingDocName(docName);
+    try {
+      await deleteRAGDocument(docName);
+      setUploadStatusMsg(`Deleted '${docName}' and updated vector index.`);
+      loadSpecsAndStats();
+    } catch (err: any) {
+      setUploadStatusMsg(
+        `Failed to delete '${docName}': ${err?.response?.data?.detail || err?.message || "Error"}`,
+      );
+    } finally {
+      setDeletingDocName(null);
+      setTimeout(() => setUploadStatusMsg(null), 5000);
+    }
+  };
+
+  const handleClearKnowledgeBase = async () => {
+    if (confirm("Clear all vector indices and all documents in knowledge base?")) {
+      await clearRAGKnowledgeBase();
+      loadSpecsAndStats();
+      setChatMessages([]);
+      localStorage.removeItem("insightrag_chat_history");
+      setActiveView("upload");
+    }
+  };
+
+  const handleClearChatOnly = () => {
+    setChatMessages([]);
+    localStorage.removeItem("insightrag_chat_history");
+  };
+
+  const copyToClipboard = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const handleSendQuery = async (overridePrompt?: string, customHistory?: typeof chatMessages) => {
+    const textToSend = (overridePrompt !== undefined ? overridePrompt : query).trim();
+    if (!textToSend || querying) return;
+    setQuery("");
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const userMsg = {
+      role: "user" as const,
+      text: textToSend,
+      timestamp: nowTime,
+    };
+
+    const historySource = customHistory !== undefined ? customHistory : chatMessages;
+    const historyPayload = historySource.slice(-6).map((m) => ({
+      role: m.role,
+      text: m.text,
+    }));
+
+    setChatMessages([...historySource, userMsg]);
+    setQuerying(true);
+    isAtBottomRef.current = true;
+    setUserScrolledUp(false);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 40);
+
+    const isCloud = processingMode !== "local";
+    const modelToUse = isCloud ? processingMode : selectedLLM;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // For cloud mode, use blocking queryRAG. For local, use SSE streaming for instant tokens.
+    if (isCloud) {
+      try {
+        const res = await queryRAG(
+          textToSend,
+          5,
+          0.0,
+          modelToUse,
+          "cloud",
+          cloudApiKey,
+          historyPayload,
+        );
+        if (controller.signal.aborted) return;
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant" as const,
+            text: res.answer || res.response || "No answer generated.",
+            sources: res.sources || res.results || [],
+            visual_snippet: res.visual_snippet,
+            visual_diagrams: res.visual_diagrams || [],
+            model: res.llm_model || modelToUse,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+      } catch (err: any) {
+        if (err?.name === "AbortError" || controller.signal.aborted) return;
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant" as const,
+            text: `Cloud query failed: ${err?.response?.data?.detail || err?.message || "Error"}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+      } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
+        setQuerying(false);
+      }
+      return;
+    }
+
+    // ─── SSE STREAMING for Local Mode ───
+    const streamMsgIndex = { current: -1 };
+    let streamedText = "";
+    let streamSources: any[] = [];
+    let streamVisual: any = null;
+    let streamVisualDiagrams: any[] = [];
+    let streamModel = modelToUse;
+
+    // Add empty assistant message placeholder
+    setChatMessages((prev) => {
+      streamMsgIndex.current = prev.length;
+      return [
+        ...prev,
+        {
+          role: "assistant" as const,
+          text: "▍",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ];
+    });
+
+    try {
+      await streamRAGQuery(
+        textToSend,
+        5,
+        0.0,
+        modelToUse,
+        "local",
+        cloudApiKey,
+        historyPayload,
+        {
+          onToken: (token: string) => {
+            if (controller.signal.aborted) return;
+            streamedText += token;
+            setChatMessages((prev) => {
+              const updated = [...prev];
+              if (streamMsgIndex.current >= 0 && updated[streamMsgIndex.current]) {
+                updated[streamMsgIndex.current] = {
+                  ...updated[streamMsgIndex.current],
+                  text: streamedText + "▍",
+                };
+              }
+              return updated;
+            });
+          },
+          onMetadata: (data: any) => {
+            if (controller.signal.aborted) return;
+            streamSources = data.results || [];
+            streamVisual = data.visual_snippet || null;
+            streamVisualDiagrams = data.visual_diagrams || [];
+            setChatMessages((prev) => {
+              const updated = [...prev];
+              if (streamMsgIndex.current >= 0 && updated[streamMsgIndex.current]) {
+                updated[streamMsgIndex.current] = {
+                  ...updated[streamMsgIndex.current],
+                  sources: streamSources,
+                  visual_snippet: streamVisual,
+                  visual_diagrams: streamVisualDiagrams,
+                };
+              }
+              return updated;
+            });
+          },
+          onDone: (data: any) => {
+            if (controller.signal.aborted) return;
+            streamModel = data.llm_model || modelToUse;
+            setChatMessages((prev) => {
+              const updated = [...prev];
+              if (streamMsgIndex.current >= 0 && updated[streamMsgIndex.current]) {
+                updated[streamMsgIndex.current] = {
+                  ...updated[streamMsgIndex.current],
+                  text:
+                    streamedText ||
+                    "No response received from local AI engine. Please verify Ollama is running and a model is downloaded in the Model Hub.",
+                  sources: streamSources,
+                  visual_snippet: streamVisual,
+                  visual_diagrams: streamVisualDiagrams,
+                  model: streamModel,
+                };
+              }
+              return updated;
+            });
+          },
+          onError: (error: string) => {
+            if (controller.signal.aborted) return;
+            setChatMessages((prev) => {
+              const updated = [...prev];
+              if (streamMsgIndex.current >= 0 && updated[streamMsgIndex.current]) {
+                updated[streamMsgIndex.current] = {
+                  ...updated[streamMsgIndex.current],
+                  text: `Stream error: ${error}\n\nPlease check that Ollama is running and try again.`,
+                };
+              }
+              return updated;
+            });
+          },
+        },
+        controller.signal,
+      );
+    } catch (err: any) {
+      if (err?.name === "AbortError" || controller.signal.aborted) {
+        return;
+      }
+      setChatMessages((prev) => {
+        const updated = [...prev];
+        if (streamMsgIndex.current >= 0 && updated[streamMsgIndex.current]) {
+          updated[streamMsgIndex.current] = {
+            ...updated[streamMsgIndex.current],
+            text: streamedText
+              ? streamedText
+              : `Connection error: ${err?.message || "Ollama unreachable"}`,
+          };
+        }
+        return updated;
+      });
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      setQuerying(false);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setQuerying(false);
+    setChatMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last.role === "assistant" && last.text.endsWith("▍")) {
+        const cleanedText = last.text.slice(0, -1).trim();
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...last,
+          text: cleanedText || "(Generation paused)",
+        };
+        return updated;
+      }
+      return prev;
+    });
+  };
+
+  const handleStartEditMessage = (idx: number, text: string) => {
+    setEditingMsgIdx(idx);
+    setEditingText(text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMsgIdx(null);
+    setEditingText("");
+  };
+
+  const handleSaveAndSubmitEdit = async (idx: number) => {
+    const trimmed = editingText.trim();
+    if (!trimmed) return;
+    setEditingMsgIdx(null);
+    setEditingText("");
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    const preservedHistory = chatMessages.slice(0, idx);
+    await handleSendQuery(trimmed, preservedHistory);
+  };
+
+  // Check if a given model tag or base model name is installed
+  const isModelInstalled = (modelId: string): boolean => {
+    if (!specs?.installed_models || !Array.isArray(specs.installed_models)) return false;
+    return specs.installed_models.some((m: string) => {
+      if (m === modelId) return true;
+      const baseM = m.split(":")[0];
+      const baseTarget = modelId.split(":")[0];
+      if (
+        baseM === baseTarget &&
+        (m.includes("3b") ||
+          m.includes("7b") ||
+          m.includes("mini") ||
+          m.includes("latest") ||
+          m.includes("1.5b") ||
+          m.includes("3.8b"))
+      ) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  // Instant Model Switcher with localStorage persistence
+  const handleSwitchModel = (modelId: string) => {
+    setSelectedLLM(modelId);
+    try {
+      localStorage.setItem("insightrag_selected_model", modelId);
+    } catch (e) {
+      console.warn("Could not save selected model to localStorage", e);
+    }
+    setSwitchToast(`Active model switched to: ${modelId}`);
+    setTimeout(() => setSwitchToast(null), 4000);
+  };
+
+  // 1-Click Streamed Model Pull with real-time progress bar & auto-switch
+  const handleInstallModel = async (modelId: string) => {
+    if (!modelId.trim() || pullingModelId) return;
+    const targetModel = modelId.trim();
+    setPullingModelId(targetModel);
+    setPullProgress((prev) => ({ ...prev, [targetModel]: 2 }));
+    setPullStatusText((prev) => ({ ...prev, [targetModel]: "Connecting to Ollama library..." }));
+
+    try {
+      await streamPullModel(targetModel, {
+        onProgress: (pct, status) => {
+          setPullProgress((prev) => ({ ...prev, [targetModel]: pct }));
+          setPullStatusText((prev) => ({ ...prev, [targetModel]: status }));
+        },
+        onDone: async () => {
+          setPullProgress((prev) => ({ ...prev, [targetModel]: 100 }));
+          setPullStatusText((prev) => ({ ...prev, [targetModel]: "Installation Complete!" }));
+          setPullingModelId(null);
+
+          // Refresh dynamic model inventory
+          try {
+            const data = await listInstalledModels();
+            if (data?.installed_models && data.installed_models.length > 0) {
+              setSpecs((prev: any) => ({
+                ...prev,
+                installed_models: data.installed_models,
+              }));
+            }
+          } catch {}
+
+          // Auto-switch to newly installed model instantly
+          handleSwitchModel(targetModel);
+        },
+        onError: (err) => {
+          setPullingModelId(null);
+          setPullStatusText((prev) => ({ ...prev, [targetModel]: `Error: ${err}` }));
+        },
+      });
+    } catch (err: any) {
+      setPullingModelId(null);
+      setPullStatusText((prev) => ({
+        ...prev,
+        [targetModel]: `Error: ${err?.message || "Failed to pull"}`,
+      }));
+    }
+  };
+
+  const handleDownloadModel = async () => {
+    if (!customModel.trim()) return;
+    await handleInstallModel(customModel.trim());
+  };
+
+  return (
+    <div
+      className="min-h-screen bg-cover bg-center bg-no-repeat p-3 sm:p-5 md:p-8 font-sans overflow-x-hidden flex flex-col justify-between relative"
+      style={{
+        backgroundImage: `url('/assets/skytextured.jpg'), url('/skytextured.jpg')`,
+        backgroundColor: "#e6f0fa",
+      }}
+    >
+      {/* Floating Model Switch Confirmation Toast */}
+      <AnimatePresence>
+        {switchToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#ffe600] text-black font-mono font-black text-xs sm:text-sm px-5 py-3 rounded-2xl border-3 border-black shadow-[5px_5px_0px_#000] flex items-center gap-2.5 max-w-lg"
+          >
+            <CheckCircle2 className="w-5 h-5 text-black shrink-0" />
+            <span className="flex-1">{switchToast}</span>
+            <button
+              onClick={() => setSwitchToast(null)}
+              className="hover:bg-black/10 rounded-md p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4 text-black" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 
+        ========================================================================
+        TERMINAL SETUP REQUIRED — LOCKED STUDIO GATE
+        Only unlocks once terminal installation / run_local.py completes!
+        ========================================================================
+      */}
+      {backendOnline === null ? (
+        <div className="max-w-md mx-auto my-auto w-full py-20 text-center space-y-4 font-mono">
+          <div className="w-12 h-12 border-4 border-black border-t-[#ffe600] rounded-full animate-spin mx-auto shadow-[3px_3px_0px_#000]" />
+          <p className="font-black text-sm text-black">
+            Connecting to Local InsightRAG Engine...
+          </p>
+          <p className="text-xs text-gray-600 font-bold">
+            Checking on-device service on port 8000
+          </p>
+        </div>
+      ) : backendOnline === false ? (
+        <div className="max-w-3xl mx-auto my-auto w-full py-4 sm:py-8 space-y-5">
+          {/* Header Back Link & Locked Badge */}
+          <div className="flex items-center justify-between">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 bg-white text-black font-mono font-black text-xs px-3.5 py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 transition active:translate-x-[1px] active:translate-y-[1px]"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>RETURN TO HOMEPAGE</span>
+            </Link>
+            <div className="flex items-center gap-1.5 bg-red-500 text-white font-mono font-black text-[11px] px-3 py-1.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] animate-pulse">
+              <Lock className="w-3.5 h-3.5" />
+              <span>STUDIO LOCKED</span>
+            </div>
+          </div>
+
+          {/* Neo-brutalist Main Locked Card */}
+          <div className="bg-white border-4 border-black rounded-3xl p-5 sm:p-8 md:p-10 shadow-[8px_8px_0px_#000] space-y-6 text-black">
+            {/* Top Lock Badge & Title */}
+            <div className="space-y-2.5 text-center sm:text-left">
+              <div className="inline-flex items-center gap-2 bg-[#ffe600] text-black font-mono font-black text-xs px-3.5 py-1.5 rounded-full border-2 border-black shadow-[2px_2px_0px_#000]">
+                <Terminal className="w-4 h-4 text-black" />
+                <span>TERMINAL SETUP REQUIRED</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black font-sans tracking-tight text-black">
+                InsightRAG Studio Unlocks After Terminal Launch
+              </h1>
+              <p className="font-mono text-xs sm:text-sm text-neutral-700 font-bold leading-relaxed">
+                InsightRAG operates <strong className="text-black">100% locally on your machine</strong> with zero cloud servers or data leakage. This Studio workspace is locked until the local engine is initialized via the terminal launch command.
+              </p>
+            </div>
+
+            {/* Terminal Command Box */}
+            <div className="bg-black text-white p-4 sm:p-5 rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] space-y-3 font-mono">
+              <div className="flex items-center justify-between text-[11px] border-b border-neutral-800 pb-2">
+                <span className="text-[#ffe600] font-black flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-[#ffe600]" />
+                  <span>STEP 1: RUN THIS IN WINDOWS POWERSHELL</span>
+                </span>
+                <span className="text-emerald-400 font-bold hidden sm:inline">100% Local Air-Gapped</span>
+              </div>
+
+              <div className="flex items-center gap-2 justify-between bg-[#0d1117] rounded-xl p-2.5 sm:p-3 border border-neutral-800">
+                <div className="flex items-center gap-2 overflow-x-auto text-emerald-400 font-bold flex-1 min-w-0 scrollbar-none">
+                  <span className="text-neutral-500 flex-shrink-0 text-xs">PS&gt;</span>
+                  <code className="whitespace-nowrap text-xs sm:text-sm text-emerald-300 select-all">
+                    irm https://www.insightrag.tech/install.ps1 | iex
+                  </code>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText("irm https://www.insightrag.tech/install.ps1 | iex");
+                    setCopiedInstall(true);
+                    setTimeout(() => setCopiedInstall(false), 2000);
+                  }}
+                  className="bg-[#ffe600] text-black font-black font-mono text-xs px-3.5 py-2 rounded-lg border-2 border-black hover:bg-yellow-400 cursor-pointer flex-shrink-0 flex items-center gap-1.5 active:scale-95 transition"
+                >
+                  {copiedInstall ? <Check className="w-3.5 h-3.5 text-black" /> : <Copy className="w-3.5 h-3.5 text-black" />}
+                  <span>{copiedInstall ? "COPIED!" : "COPY COMMAND"}</span>
+                </button>
+              </div>
+
+              <div className="text-[11px] text-neutral-400 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <span>Terminal completes setup &amp; this page will automatically unlock!</span>
+              </div>
+            </div>
+
+            {/* 4 Steps Checklist */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="bg-neutral-50 border-2 border-black rounded-2xl p-3.5 space-y-1">
+                <div className="flex items-center gap-2 font-mono font-black text-xs">
+                  <span className="w-5 h-5 rounded-full bg-black text-[#ffe600] flex items-center justify-center text-[10px]">1</span>
+                  <span>Open PowerShell</span>
+                </div>
+                <p className="text-[11px] font-mono text-neutral-600 font-bold pl-7">
+                  Press <kbd className="bg-neutral-200 px-1 rounded border border-neutral-400 text-black">Win + X</kbd> and select PowerShell or Terminal.
+                </p>
+              </div>
+
+              <div className="bg-neutral-50 border-2 border-black rounded-2xl p-3.5 space-y-1">
+                <div className="flex items-center gap-2 font-mono font-black text-xs">
+                  <span className="w-5 h-5 rounded-full bg-black text-[#ffe600] flex items-center justify-center text-[10px]">2</span>
+                  <span>Paste &amp; Run 1-Liner</span>
+                </div>
+                <p className="text-[11px] font-mono text-neutral-600 font-bold pl-7">
+                  Paste the command and hit Enter. No manual setup needed.
+                </p>
+              </div>
+
+              <div className="bg-neutral-50 border-2 border-black rounded-2xl p-3.5 space-y-1">
+                <div className="flex items-center gap-2 font-mono font-black text-xs">
+                  <span className="w-5 h-5 rounded-full bg-black text-[#ffe600] flex items-center justify-center text-[10px]">3</span>
+                  <span>Terminal Configures AI</span>
+                </div>
+                <p className="text-[11px] font-mono text-neutral-600 font-bold pl-7">
+                  Auto-checks Python, Ollama, Vector DB, and boots engine on port 8000.
+                </p>
+              </div>
+
+              <div className="bg-neutral-50 border-2 border-black rounded-2xl p-3.5 space-y-1">
+                <div className="flex items-center gap-2 font-mono font-black text-xs text-emerald-700">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center text-[10px] font-black">4</span>
+                  <span>Studio Auto-Unlocks!</span>
+                </div>
+                <p className="text-[11px] font-mono text-neutral-600 font-bold pl-7">
+                  This page continuously pings port 8000 and unlocks automatically.
+                </p>
+              </div>
+            </div>
+
+            {/* Live Engine Status Detector */}
+            <div className="border-t-2 border-neutral-200 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 font-mono text-xs font-bold text-neutral-700">
+                <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse border border-black" />
+                <span>Waiting for terminal steps to complete (port 8000)...</span>
+              </div>
+              <button
+                onClick={loadSpecsAndStats}
+                disabled={checkingHealth}
+                className="bg-black text-[#ffe600] hover:bg-neutral-800 font-mono font-black text-xs px-4 py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px]"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${checkingHealth ? "animate-spin" : ""}`} />
+                <span>{checkingHealth ? "Detecting Engine..." : "Check Status Now"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`mx-auto space-y-4 sm:space-y-6 w-full ${activeView === "chat" ? "max-w-6xl" : "max-w-5xl"}`}
+        >
+        {/* 1. TOP SYSTEM SPECS BADGE */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 bg-black text-white p-3 sm:px-5 sm:py-3 rounded-2xl shadow-xl border-2 border-black font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 font-bold">
+            {backendOnline === false ? (
+              <span className="inline-flex items-center gap-1.5 bg-red-950/90 px-2.5 py-1 rounded-full border border-red-700 text-red-400">
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+                <span>LOCAL ENGINE OFFLINE</span>
+              </span>
+            ) : backendOnline === true ? (
+              <span className="inline-flex items-center gap-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-full border border-gray-800">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-emerald-400">
+                  {specs.gpu_name} ({specs.vram_gb} GB)
+                </span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-full border border-gray-800 text-gray-400">
+                <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                <span>Checking Local Engine...</span>
+              </span>
+            )}
+
+            {backendOnline && (
+              <>
+                <span className="hidden sm:inline-block text-gray-500">|</span>
+                <span>
+                  RAM: <span className="text-amber-300">{specs.ram_gb} GB</span>
+                </span>
+
+                <span className="hidden sm:inline-block text-gray-500">|</span>
+                <span>
+                  CPU: <span className="text-amber-300">{specs.cpu_threads} Threads</span>
+                </span>
+
+                <span className="hidden md:inline-block text-gray-500">|</span>
+                <span className="hidden md:inline-flex items-center gap-1.5">
+                  <span className="text-gray-400">LLM:</span>
+                  <span className="text-[#ffe600] font-black">{selectedLLM}</span>
+                </span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            {backendOnline && (
+              <button
+                type="button"
+                onClick={() => setShowModelHubModal(true)}
+                className="bg-[#ffe600] hover:bg-yellow-400 text-black font-black font-mono text-[10px] sm:text-xs px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px]"
+                title="Browse & Install Open-Source Models"
+              >
+                <Sparkles className="w-3 h-3 text-black" />
+                <span>Model Hub</span>
+              </button>
+            )}
+            {backendOnline === false && (
+              <button
+                onClick={loadSpecsAndStats}
+                disabled={checkingHealth}
+                className="cursor-pointer bg-neutral-800 hover:bg-neutral-700 text-[#ffe600] font-mono text-[10px] sm:text-xs px-2.5 py-1 rounded-md border border-neutral-700 flex items-center gap-1 transition-colors"
+                title="Retry connection to local engine"
+              >
+                <RotateCcw className={`w-3 h-3 ${checkingHealth ? "animate-spin" : ""}`} />
+                {checkingHealth ? "Checking..." : "Reconnect"}
+              </button>
+            )}
+            <span
+              className={`font-black font-mono text-[10px] sm:text-xs px-2.5 py-1 rounded-md uppercase tracking-wider border border-black shadow-[2px_2px_0px_#000] ${
+                backendOnline === false
+                  ? "bg-red-500 text-white"
+                  : backendOnline === true
+                    ? "bg-[#ffe600] text-black"
+                    : "bg-gray-400 text-black"
+              }`}
+            >
+              {backendOnline === false ? "ENGINE DISCONNECTED" : specs.acceleration_mode}
+            </span>
+          </div>
+        </div>
+
+        {/* CONDITIONAL ACTIVE VIEW ROUTING */}
+        {activeView === "processing" ? (
+          /* DEDICATED DEEP MULTI-MODAL PARSING & UNDERSTANDING VIEW */
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-6 sm:p-10 border-3 border-black shadow-[6px_6px_0px_#000] sm:shadow-[10px_10px_0px_#000] space-y-6 text-black font-mono">
+            {/* Header */}
+            <div className="border-b-2 border-black pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="bg-black text-[#ffe600] text-[10px] font-black px-2 py-0.5 rounded border border-black uppercase animate-pulse">
+                    PARSING PIPELINE
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-black">
+                    Deep Multi-Modal Understanding
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 font-bold">
+                  Thoroughly extracting every page, table, image & diagram before entering the Chat
+                  Studio.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setActiveView("upload");
+                  setUploading(false);
+                }}
+                className="bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold px-3 py-1.5 rounded-lg border border-black shadow-[1px_1px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+              >
+                ← Back to Upload
+              </button>
+            </div>
+
+            {/* Current File Processing Progress */}
+            <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-black text-[#ffe600] flex items-center justify-center font-bold text-base shadow-[2px_2px_0px_#000] shrink-0">
+                  <FileText className="w-5 h-5 text-[#ffe600]" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase text-black">
+                    Currently Ingesting ({currentUploadingFiles.length || files.length} Document
+                    {currentUploadingFiles.length > 1 ? "s" : ""})
+                  </div>
+                  <div className="text-xs text-gray-800 font-bold truncate max-w-md">
+                    {currentUploadingFiles.length > 0
+                      ? currentUploadingFiles.join(", ")
+                      : files.map((f) => f.name).join(", ")}
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full sm:w-52 space-y-1">
+                <div className="flex justify-between text-[11px] font-black">
+                  <span>PROGRESS</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 h-3.5 rounded-full border border-black overflow-hidden">
+                  <div
+                    className="bg-[#ffe600] h-full transition-all duration-300 ease-out border-r border-black"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 6 Parsing Milestones Breakdown */}
+            <div className="space-y-3">
+              <div className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-black" />
+                <span>Comprehension Milestones:</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {PARSING_STAGES.map((stage, sIdx) => {
+                  const isDone = processingStep > stage.step;
+                  const isCurrent = processingStep === stage.step;
+
+                  return (
+                    <div
+                      key={sIdx}
+                      className={`p-3.5 rounded-xl border-2 transition-all flex items-start gap-3.5 ${
+                        isDone
+                          ? "bg-emerald-50/70 border-emerald-500 shadow-[2px_2px_0px_#10b981]"
+                          : isCurrent
+                            ? "bg-yellow-50 border-black shadow-[3px_3px_0px_#000] ring-2 ring-[#ffe600]"
+                            : "bg-gray-50/70 border-gray-200 opacity-50"
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {isDone ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        ) : isCurrent ? (
+                          <Sparkles className="w-5 h-5 text-black animate-spin" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center text-[10px] font-bold text-gray-400">
+                            {stage.step + 1}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-black">
+                            {stage.icon} {stage.title}
+                          </span>
+                          {isCurrent && (
+                            <span className="bg-[#ffe600] text-black text-[9px] font-black px-1.5 py-0.2 rounded border border-black uppercase animate-pulse">
+                              ANALYZING
+                            </span>
+                          )}
+                          {isDone && (
+                            <span className="bg-emerald-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded border border-black uppercase">
+                              DONE
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5 leading-relaxed font-sans font-medium">
+                          {stage.desc}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Auto-redirect Helper Notice */}
+            <div className="p-3 bg-gray-100 rounded-xl border border-gray-300 text-[11px] text-gray-700 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-black shrink-0" />
+              <span>
+                Deep comprehension running. You will be automatically redirected to the{" "}
+                <strong>Full-Screen Chat Studio</strong> once ready.
+              </span>
+            </div>
+          </div>
+        ) : activeView === "chat" ? (
+          /* DEDICATED FULL-SCREEN CHAT STUDIO VIEW */
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-3 sm:p-6 border-2 sm:border-3 border-black shadow-[4px_4px_0px_#000] sm:shadow-[10px_10px_0px_#000] space-y-3 sm:space-y-4 text-black min-h-[82vh] flex flex-col justify-between">
+            {/* Top Navigation & Status Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-b-2 border-gray-200 pb-3 gap-2.5 sm:gap-3">
+              <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3">
+                <button
+                  onClick={() => setActiveView("upload")}
+                  className="flex items-center gap-1.5 bg-[#ffe600] hover:bg-yellow-400 text-black font-black font-mono text-xs px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                  title="Return to document manager"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black shrink-0" />
+                  <span className="hidden sm:inline">← Back to Upload & Documents</span>
+                  <span className="sm:hidden">← Documents</span>
+                </button>
+
+                <div className="h-6 w-[2px] bg-gray-300 hidden sm:block" />
+
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-black flex items-center justify-center text-[#ffe600] shadow-[2px_2px_0px_#000] shrink-0">
+                    <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm text-black uppercase tracking-tight">
+                      <span>Studio</span>
+                      <span className="bg-emerald-400/20 text-emerald-700 text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-bold border border-emerald-400">
+                        Active
+                      </span>
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] font-mono text-gray-500">
+                      {ragStats.files?.length || 0} doc(s) • {ragStats.total_vectors || 0} vectors
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 font-mono text-[11px] font-bold">
+                <span className="hidden lg:inline-flex bg-emerald-400 text-black px-2 py-0.5 rounded-lg border border-black shadow-[1px_1px_0px_#000] items-center gap-1">
+                  <Zap className="w-3 h-3 text-black" />
+                  <span>{embeddingModel}</span>
+                </span>
+
+                {/* Model Quick Switcher in Chat Header */}
+                {processingMode === "local" ? (
+                  <div className="flex items-center gap-1 sm:gap-1.5 flex-1 sm:flex-initial justify-end">
+                    <select
+                      value={selectedLLM}
+                      onChange={(e) => handleSwitchModel(e.target.value)}
+                      className="bg-black text-[#ffe600] font-mono text-[10px] sm:text-[11px] font-black px-2 py-1 rounded-lg border border-black shadow-[1px_1px_0px_#000] cursor-pointer focus:outline-none max-w-[140px] sm:max-w-none truncate"
+                      title="Quick Switch Active Local Model"
+                    >
+                      {specs?.installed_models && specs.installed_models.length > 0 ? (
+                        specs.installed_models.map((m: string) => (
+                          <option key={m} value={m} className="bg-white text-black font-bold">
+                            {m}
+                          </option>
+                        ))
+                      ) : (
+                        <option value={selectedLLM} className="bg-white text-black font-bold">
+                          {selectedLLM}
+                        </option>
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowModelHubModal(true)}
+                      className="bg-[#ffe600] hover:bg-yellow-400 text-black px-2 py-1 rounded-lg border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 font-mono font-black text-[10px] cursor-pointer active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                      title="Open Open-Source Model Hub"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Hub</span>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="bg-purple-600 text-white px-2 py-1 rounded-lg border border-black shadow-[1px_1px_0px_#000] animate-pulse flex items-center gap-1 text-[10px]">
+                    <Zap className="w-3 h-3 text-white" />
+                    <span>{processingMode.split(":")[0].toUpperCase()}</span>
+                  </span>
+                )}
+
+                {chatMessages.length > 0 && (
+                  <button
+                    onClick={handleClearChatOnly}
+                    title="Start fresh conversation"
+                    className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-black px-2 py-1 rounded-lg border border-black shadow-[1px_1px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] cursor-pointer shrink-0 text-[10px] sm:text-[11px]"
+                  >
+                    <RotateCcw className="w-3 h-3 text-red-600" />
+                    <span className="hidden xs:inline">New Chat</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Suggested Prompt Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 font-mono text-[11px] scrollbar-none touch-scroll">
+              <span className="text-gray-500 font-bold shrink-0 flex items-center gap-1 text-[10px]">
+                <Sparkles className="w-3 h-3 text-[#ffe600]" /> SUGGESTIONS:
+              </span>
+              {[
+                "Summarize key findings",
+                "What are the primary conclusions?",
+                "List actionable protocols & steps",
+                "Explain the core terms & data",
+              ].map((sug, sIdx) => (
+                <button
+                  key={sIdx}
+                  onClick={() => handleSendQuery(sug)}
+                  disabled={querying}
+                  className="bg-gray-50 hover:bg-[#ffe600] text-gray-800 hover:text-black px-2.5 py-1 rounded-lg border border-gray-300 hover:border-black transition font-semibold shrink-0 cursor-pointer text-[10px]"
+                >
+                  {sug}
+                </button>
+              ))}
+            </div>
+
+            {/* Full-Screen Chat Messages Container */}
+            <div
+              ref={chatContainerRef}
+              onScroll={handleChatScroll}
+              className="relative flex-1 min-h-[380px] sm:min-h-[460px] max-h-[60vh] sm:max-h-[64vh] overflow-y-auto space-y-3 sm:space-y-4 p-2.5 sm:p-4 font-mono text-xs bg-gray-50/70 rounded-2xl border-2 border-black scroll-smooth touch-scroll"
+            >
+              {chatMessages.length === 0 ? (
+                <div className="text-center text-gray-500 py-16 sm:py-20 space-y-3">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl border-2 border-black mx-auto flex items-center justify-center shadow-[3px_3px_0px_#000]">
+                    <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-black" />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-xs sm:text-sm text-black">
+                      Start your grounded document consultation
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-gray-600 mt-0.5">
+                      Multi-turn memory enabled • Grounded on {ragStats.total_vectors} indexed vectors
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+                  >
+                    <div
+                      className={`p-3 sm:p-4 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] space-y-2 max-w-[96%] sm:max-w-[85%] ${
+                        msg.role === "user"
+                          ? "bg-[#ffe600] text-black font-bold ml-auto"
+                          : "bg-white text-black"
+                      }`}
+                    >
+                      {/* Message Meta Header */}
+                      <div className="flex items-center justify-between gap-3 text-[10px] font-mono border-b border-black/10 pb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          {msg.role === "user" ? (
+                            <>
+                              <div className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center">
+                                <User className="w-2.5 h-2.5 text-[#ffe600]" />
+                              </div>
+                              <span className="font-black uppercase">You</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center">
+                                <Bot className="w-2.5 h-2.5 text-[#ffe600]" />
+                              </div>
+                              <span className="font-black uppercase">InsightRAG AI</span>
+                              <span className="bg-gray-100 px-1.5 py-0.2 rounded border border-gray-300 text-[9px] text-gray-600">
+                                {msg.model || selectedLLM}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {msg.role === "user" && editingMsgIdx !== idx && !querying && (
+                            <button
+                              onClick={() => handleStartEditMessage(idx, msg.text)}
+                              className="text-black/70 hover:text-black p-0.5 rounded hover:bg-black/10 transition cursor-pointer flex items-center gap-1 text-[10px]"
+                              title="Edit question"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                              <span className="text-[9px] font-mono font-bold">Edit</span>
+                            </button>
+                          )}
+                          {msg.timestamp && (
+                            <span className="text-[9px] text-gray-500 font-normal">
+                              {msg.timestamp}
+                            </span>
+                          )}
+                          {msg.role === "assistant" && (
+                            <button
+                              onClick={() => copyToClipboard(msg.text, idx)}
+                              className="text-gray-600 hover:text-black p-0.5 rounded hover:bg-gray-100 transition cursor-pointer flex items-center gap-1"
+                              title="Copy answer"
+                            >
+                              {copiedIdx === idx ? (
+                                <span className="text-[9px] text-emerald-600 font-bold flex items-center gap-0.5">
+                                  <Check className="w-3 h-3" /> Copied
+                                </span>
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Message Body Content */}
+                      {msg.role === "assistant" ? (
+                        <div className="relative">
+                          <FormattedMarkdown content={msg.text.replace(/▍$/, "")} />
+                          {msg.text.endsWith("▍") && (
+                            <span className="inline-block w-2 h-3.5 bg-purple-600 animate-pulse ml-1 align-middle rounded-xs" />
+                          )}
+                        </div>
+                      ) : editingMsgIdx === idx ? (
+                        <div className="space-y-2 w-full pt-1">
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            rows={Math.min(6, Math.max(2, editingText.split("\n").length))}
+                            className="w-full p-2 text-xs sm:text-sm bg-white text-black border-2 border-black rounded-lg font-sans font-normal focus:outline-hidden focus:ring-2 focus:ring-purple-500 resize-y"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveAndSubmitEdit(idx);
+                              } else if (e.key === "Escape") {
+                                handleCancelEdit();
+                              }
+                            }}
+                          />
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="px-2.5 py-1 text-[11px] font-mono font-bold bg-white text-black border border-black rounded-md hover:bg-gray-100 transition shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveAndSubmitEdit(idx)}
+                              disabled={!editingText.trim()}
+                              className="px-3 py-1 text-[11px] font-mono font-bold bg-black text-[#ffe600] rounded-md hover:bg-gray-800 disabled:opacity-50 transition shadow-[1px_1px_0px_#000] cursor-pointer flex items-center gap-1"
+                            >
+                              Save & Submit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-xs sm:text-sm text-gray-900 font-medium">
+                          {msg.text}
+                        </div>
+                      )}
+
+                      {/* Grounded Source Citations & References Accordion */}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <details className="mt-3 group rounded-xl border-2 border-black/80 bg-gray-50 overflow-hidden shadow-[2px_2px_0px_#000] text-xs">
+                          <summary className="px-3 py-2 bg-white cursor-pointer font-mono text-[10px] font-black text-black flex items-center justify-between hover:bg-yellow-50 transition-colors select-none">
+                            <span className="flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-purple-600" />
+                              <span>VERIFIED SOURCE CITATIONS ({msg.sources.length})</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-gray-500 group-open:rotate-180 transition-transform">
+                              ▼
+                            </span>
+                          </summary>
+                          <div className="p-2.5 space-y-2 border-t border-black/10 max-h-56 overflow-y-auto bg-gray-50/50">
+                            {msg.sources.map((src: any, sIdx: number) => {
+                              const sMeta = src.metadata || {};
+                              const sPage = sMeta.page_number || sMeta.page || "1";
+                              const sDoc = sMeta.file_name || sMeta.title || "Document";
+                              const sScore = typeof src.similarity_score === "number"
+                                ? Math.round(src.similarity_score * 100)
+                                : null;
+                              return (
+                                <div
+                                  key={sIdx}
+                                  className="p-2 rounded-lg bg-white border border-gray-300 text-[11px] space-y-1 shadow-[1px_1px_0px_#000]"
+                                >
+                                  <div className="flex items-center justify-between font-mono text-[10px] text-gray-700 font-bold border-b border-gray-100 pb-1">
+                                    <span className="text-purple-700 font-black">
+                                      [{sIdx + 1}] {sDoc} (Page {sPage})
+                                    </span>
+                                    {sScore !== null && (
+                                      <span className="bg-emerald-50 text-emerald-700 px-1 rounded border border-emerald-300 text-[9px] font-mono font-bold">
+                                        {sScore}% Match
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-600 line-clamp-3 font-sans italic">
+                                    "{src.text || src.embedded_text || ""}"
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      )}
+
+                      {/* Focused Diagram / Sub-region Visual Evidence Card */}
+                      {msg.visual_snippet && msg.visual_snippet.has_image && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] space-y-2">
+                          <div className="flex items-center justify-between font-mono text-[10px] font-bold text-black border-b border-gray-200 pb-1.5">
+                            <span className="flex items-center gap-1.5 text-black font-black">
+                              <Camera className="w-3.5 h-3.5 text-[#ec4899]" />
+                              <span>
+                                FOCUSED VISUAL EVIDENCE (PAGE {msg.visual_snippet.page})
+                              </span>
+                            </span>
+                            <span className="bg-[#ffe600] px-1.5 py-0.5 rounded border border-black text-[9px] font-mono font-bold">
+                              ROI Crop
+                            </span>
+                          </div>
+                          <div className="relative group overflow-hidden rounded-lg border border-black bg-white flex items-center justify-center p-1">
+                            <img
+                              src={msg.visual_snippet.crop_url}
+                              alt={msg.visual_snippet.caption || "Diagram snippet"}
+                              className="max-h-60 w-full object-contain cursor-pointer hover:scale-105 transition-transform duration-200 rounded"
+                              onClick={() =>
+                                window.open(
+                                  msg.visual_snippet.crop_url,
+                                  "_blank",
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-gray-600 font-medium pt-1">
+                            <span className="truncate max-w-[70%] font-bold text-gray-800">
+                              {msg.visual_snippet.caption}
+                            </span>
+                            <button
+                              onClick={() =>
+                                window.open(
+                                  msg.visual_snippet.crop_url,
+                                  "_blank",
+                                )
+                              }
+                              className="text-black hover:text-blue-600 flex items-center gap-1 font-black cursor-pointer bg-white hover:bg-gray-100 px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]"
+                            >
+                              <span>Open High-Res</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attached Visual Diagrams & Schematics */}
+                      {msg.visual_diagrams && msg.visual_diagrams.length > 0 && (
+                        <div className="mt-3 p-3 bg-white rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                          <div className="flex items-center justify-between font-mono text-[10px] font-black text-black border-b-2 border-black pb-1.5">
+                            <span className="flex items-center gap-1.5 text-black">
+                              <Eye className="w-3.5 h-3.5 text-[#a855f7]" />
+                              <span>
+                                ATTACHED VISUAL DIAGRAMS ({msg.visual_diagrams.length})
+                              </span>
+                            </span>
+                            <span className="bg-[#a855f7] text-white px-2 py-0.5 rounded border border-black text-[9px] font-mono font-black">
+                              Multimodal Evidence
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {msg.visual_diagrams.map((vd: any, vIdx: number) => {
+                              const imgUrl = vd.image_url?.startsWith("http")
+                                ? vd.image_url
+                                : vd.image_url || "";
+                              return (
+                                <div
+                                  key={vIdx}
+                                  className="group border-2 border-black rounded-lg overflow-hidden bg-gray-50 flex flex-col justify-between shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#a855f7] transition-all"
+                                >
+                                  <div
+                                    className="relative bg-white flex items-center justify-center p-2 border-b border-black cursor-pointer overflow-hidden max-h-48"
+                                    onClick={() => window.open(imgUrl, "_blank")}
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={vd.caption || `Diagram ${vIdx + 1}`}
+                                      className="max-h-40 w-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute top-1.5 right-1.5 bg-black/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded border border-white/20">
+                                      Page {vd.page || 1}
+                                    </div>
+                                  </div>
+                                  <div className="p-2 flex flex-col justify-between gap-1.5 bg-white">
+                                    <div className="text-[11px] font-bold text-gray-900 line-clamp-2 leading-tight">
+                                      {vd.caption || `Diagram on Page ${vd.page || 1}`}
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                                      <span className="text-[9px] font-mono text-gray-500 truncate max-w-[120px]">
+                                        {vd.doc_name || "Document"}
+                                      </span>
+                                      <button
+                                        onClick={() => window.open(imgUrl, "_blank")}
+                                        className="text-[9px] font-mono font-black flex items-center gap-1 bg-[#ffe600] hover:bg-[#ffd000] text-black px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000] cursor-pointer"
+                                      >
+                                        <span>High-Res</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              )}
+
+              {/* Streaming / Inference Loading Indicator */}
+              {querying && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-2"
+                >
+                  <div className="bg-white p-3.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-2.5 text-xs text-gray-800 font-mono">
+                    <Sparkles className="w-4 h-4 animate-spin text-[#ffe600]" />
+                    <span className="animate-pulse font-bold">
+                      Retrieving vector context & synthesizing grounded response...
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
+              <div ref={messagesEndRef} />
+
+              {/* Floating resume auto-scroll button when user scrolled up */}
+              <AnimatePresence>
+                {userScrolledUp && (
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.9 }}
+                    onClick={() => {
+                      isAtBottomRef.current = true;
+                      setUserScrolledUp(false);
+                      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="sticky bottom-2 left-1/2 -translate-x-1/2 bg-black text-[#ffe600] hover:bg-neutral-800 px-3.5 py-1.5 rounded-full border-2 border-black shadow-[2px_2px_0px_#000] font-mono font-black text-[11px] flex items-center gap-1.5 cursor-pointer z-30 transition-all active:scale-95 mx-auto"
+                    title="Scroll down to latest response"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
+                    <span>Scroll to Latest</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Input Bar Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendQuery();
+              }}
+              className="flex gap-1.5 sm:gap-2 pt-2 border-t border-gray-200"
+            >
+              <input
+                ref={chatInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={
+                  querying
+                    ? "InsightRAG AI is streaming answer... (Click Pause / Stop to halt)"
+                    : "Ask any question about your uploaded documents..."
+                }
+                disabled={querying}
+                className="flex-1 min-w-0 bg-gray-50 font-mono text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 sm:p-3 focus:outline-none focus:bg-white focus:ring-2 focus:ring-black shadow-inner disabled:opacity-80"
+              />
+              {querying ? (
+                <button
+                  type="button"
+                  onClick={handleStopGeneration}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-black font-mono text-xs px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition active:translate-x-[1px] active:translate-y-[1px] animate-pulse"
+                  title="Pause / Stop generation"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current text-white" />
+                  <span className="hidden xs:inline">Pause</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!query.trim()}
+                  className="bg-black text-white hover:bg-gray-800 font-bold font-mono text-xs px-3.5 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 transition active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  <span>Send</span>
+                  <Send className="w-3.5 h-3.5 text-[#ffe600]" />
+                </button>
+              )}
+            </form>
+          </div>
+        ) : (
+          /* 2. MAIN STUDIO CONTAINER CARD (UPLOAD VIEW) */
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 md:p-8 border-2 sm:border-3 border-black shadow-[4px_4px_0px_rgba(0,0,0,0.9)] sm:shadow-[10px_10px_0px_rgba(0,0,0,0.9)] space-y-4 sm:space-y-6 text-black">
+            {/* Header Title + Actions */}
+            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between border-b-2 border-black pb-3.5 sm:pb-5 gap-3 sm:gap-3.5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#ffe600] text-black font-mono font-black text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full border border-black uppercase tracking-wider">
+                    KNOWLEDGE STUDIO
+                  </span>
+                  <span className="bg-emerald-100 text-emerald-900 font-mono font-bold text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border border-emerald-400">
+                    AIR-GAPPED FAISS
+                  </span>
+                </div>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-black font-sans uppercase">
+                  Multi-Modal Document Intelligence
+                </h1>
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-mono text-gray-700 font-bold">
+                  <span className="text-gray-900 font-black">100% Confidential</span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600 font-medium shrink-0">Zero Cloud Leakage</span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600 font-medium shrink-0">Hardware Vectors</span>
+                  <span className="text-gray-400 hidden sm:inline">•</span>
+                  <span className="text-gray-600 font-medium hidden sm:inline shrink-0">Visual OCR</span>
+                </div>
+              </div>
+
+              {/* Right Side: Clean Unified Button Row */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full xl:w-auto justify-start xl:justify-end shrink-0">
+                {ragStats.total_vectors > 0 && (
+                  <button
+                    onClick={() => setActiveView("chat")}
+                    className="bg-[#ffe600] hover:bg-yellow-400 text-black font-black font-mono text-xs px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                  >
+                    <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
+                    <span>Chat Studio ({ragStats.total_vectors}) →</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowModelHubModal(true)}
+                  className="bg-black text-[#ffe600] hover:bg-neutral-800 font-black font-mono text-xs px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                  title="Browse, install, and switch open-source LLMs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#ffe600]" />
+                  <span>Model Hub</span>
+                </button>
+                <Link
+                  to="/docs"
+                  className="bg-white hover:bg-gray-100 text-black font-bold font-mono text-xs px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-black" />
+                  <span>Docs</span>
+                </Link>
+                <Link
+                  to="/"
+                  className="bg-white hover:bg-gray-100 text-black font-bold font-mono text-xs px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                >
+                  Home
+                </Link>
+              </div>
+            </div>
+
+            {/* NO MODEL INSTALLED ALERT BANNER */}
+            {backendOnline && (!specs.installed_models || specs.installed_models.length === 0) && (
+              <div className="p-3.5 bg-amber-50 border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400 border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                    <AlertTriangle className="w-4 h-4 text-black" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
+                      <span>No Local AI Model Detected in Ollama</span>
+                      <span className="bg-amber-200 text-[10px] font-mono px-2 py-0.5 rounded-full border border-black font-bold">Action Needed</span>
+                    </div>
+                    <div className="text-xs font-mono font-medium text-black/80 mt-0.5">
+                      100% offline chat requires a local LLM. Install with 1-click or run: <code className="bg-amber-200 px-1.5 py-0.5 rounded font-bold">ollama pull qwen2.5:3b</code>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <button
+                    onClick={() => handleInstallModel("qwen2.5:3b")}
+                    disabled={pullingModelId !== null}
+                    className="px-3 py-1.5 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 text-black border-2 border-black rounded-xl font-mono text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{pullingModelId === "qwen2.5:3b" ? `Installing (${pullProgress["qwen2.5:3b"] || 0}%)` : "Quick Install (qwen2.5:3b)"}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowModelHubModal(true)}
+                    className="px-3 py-1.5 bg-white hover:bg-gray-50 text-black border-2 border-black rounded-xl font-mono text-xs font-bold shadow-[2px_2px_0px_#000] cursor-pointer"
+                  >
+                    Model Hub
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3. COMPACT QUICK CONTROL BAR & ADVANCED SETTINGS */}
+            <div className="space-y-3">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 sm:p-3.5 bg-gray-50/90 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000]">
+                {/* Left: Model Selector & Hub */}
+                <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                    <span className="text-xs font-black font-mono uppercase tracking-wider text-black">
+                      AI Model:
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
+                    <select
+                      value={selectedLLM}
+                      onChange={(e) => handleSwitchModel(e.target.value)}
+                      disabled={processingMode !== "local"}
+                      className="w-full bg-white disabled:bg-gray-100 font-mono text-xs font-bold border-2 border-black rounded-xl px-3 py-1.5 shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer truncate"
+                    >
+                      {specs.installed_models && specs.installed_models.length > 0 ? (
+                        specs.installed_models.map((m: string) => (
+                          <option key={m} value={m}>
+                            {m} {m.includes("vl") || m.includes("vision") ? "[Vision & OCR]" : m.includes("coder") ? "[Code & Logic]" : m === "llama3.2:3b" ? "[Fast & Light]" : "[Local LLM]"}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">⚠️ No Local Models Installed</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right: Quick Mode/Hardware Badge & Advanced Settings Toggle */}
+                <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
+                  {/* Mode Badge */}
+                  <span
+                    className={`text-[10px] font-black font-mono px-2.5 py-1.5 rounded-xl border-2 border-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0px_#000] ${
+                      processingMode === "local"
+                        ? "bg-emerald-100 text-emerald-950 border-black"
+                        : "bg-purple-100 text-purple-950 border-black"
+                    }`}
+                  >
+                    {processingMode === "local" ? (
+                      <>
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>100% Local</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5 text-purple-700" />
+                        <span>Cloud Turbo</span>
+                      </>
+                    )}
+                  </span>
+
+                  {/* Hardware Pill */}
+                  {processingMode === "local" && (
+                    <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] font-mono text-[11px] font-black text-black">
+                      {activeHardwareMode === "gpu" && specs.has_gpu_access ? (
+                        <span className="flex items-center gap-1 text-emerald-800">
+                          <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
+                          <span>GPU Active</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-neutral-800">
+                          <Cpu className="w-3.5 h-3.5 text-black" />
+                          <span>CPU ({specs.cpu_threads || 8}T)</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Advanced Settings Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px] ${
+                      showAdvancedSettings
+                        ? "bg-black text-[#ffe600]"
+                        : "bg-white text-black hover:bg-gray-100"
+                    }`}
+                    title="Toggle Advanced Pipeline & Engine Settings"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Pipeline Settings</span>
+                    {showAdvancedSettings ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* COLLAPSIBLE ADVANCED SETTINGS ACCORDION */}
+              <AnimatePresence>
+                {showAdvancedSettings && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-4 sm:p-5 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 font-mono">
+                      <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Settings2 className="w-4 h-4 text-black" />
+                          <h3 className="text-xs sm:text-sm font-black uppercase text-black">
+                            Advanced Engine & Ingestion Pipeline Settings
+                          </h3>
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-bold hidden sm:inline">
+                          Configure embeddings, hardware offload & vision pipeline
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* COMPUTE ARCHITECTURE */}
+                        <div className="space-y-1.5 md:col-span-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-black uppercase tracking-wider text-gray-700 block">
+                              Compute Architecture
+                            </label>
+                            <span className="text-[10px] font-bold text-gray-500">
+                              {processingMode === "local" ? "Offline On-Device" : "Cloud Hosted"}
+                            </span>
+                          </div>
+                          <select
+                            value={processingMode}
+                            onChange={(e) => setProcessingMode(e.target.value)}
+                            className="w-full bg-white font-mono text-xs font-bold border-2 border-black rounded-xl p-2.5 shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
+                          >
+                            <option value="local">
+                              [Local] 100% On-Device (Zero Budget • Offline • Privacy Guaranteed • Ollama) [DEFAULT]
+                            </option>
+                            <option value="groq:llama-3.3-70b-versatile">
+                              [Cloud Turbo] Groq Llama-3.3 70B (500+ Page Fast Cloud Processing)
+                            </option>
+                            <option value="gemini:gemini-1.5-flash">
+                              [Cloud Reasoning] Google Gemini 1.5 Flash (1M Long Context)
+                            </option>
+                            <option value="openai:gpt-4o-mini">
+                              [Cloud Enterprise] OpenAI GPT-4o-mini (High-Speed Multimodal)
+                            </option>
+                          </select>
+
+                          {processingMode !== "local" && (
+                            <div className="p-2.5 bg-purple-50 rounded-xl border border-purple-300 space-y-1.5 mt-2">
+                              <input
+                                type="password"
+                                value={cloudApiKey}
+                                onChange={(e) => setCloudApiKey(e.target.value)}
+                                placeholder="Enter Cloud API Key (Optional — leave blank to use server key)"
+                                className="w-full bg-white border border-black rounded-lg p-2 font-mono text-xs font-bold focus:outline-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* HARDWARE ACCELERATION ENGINE */}
+                        {processingMode === "local" && (
+                          <div className="space-y-1.5 md:col-span-2">
+                            <div className="p-3 bg-gray-50 rounded-xl border border-gray-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-black text-[#ffe600] flex items-center justify-center shrink-0">
+                                  <Cpu className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black uppercase text-black">
+                                      Hardware Acceleration Engine
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 truncate">
+                                    {activeHardwareMode === "cpu"
+                                      ? `Multi-threaded CPU execution (${specs.cpu_threads || 8} Threads)`
+                                      : `Hardware CUDA offload on ${specs.gpu_name || "GPU"}`}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Segmented Switch */}
+                              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-black shrink-0 self-start sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchHardware("cpu")}
+                                  disabled={switchingHardware}
+                                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-black transition cursor-pointer ${
+                                    activeHardwareMode === "cpu"
+                                      ? "bg-black text-white"
+                                      : "text-gray-700 hover:text-black"
+                                  }`}
+                                >
+                                  <Cpu className="w-3 h-3" />
+                                  <span>CPU ({specs.cpu_threads || 8}T)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchHardware("gpu")}
+                                  disabled={switchingHardware || !specs.has_gpu_access}
+                                  title={
+                                    !specs.has_gpu_access
+                                      ? specs.gpu_disabled_reason || "GPU acceleration disabled on this device."
+                                      : "Switch computation & Ollama to GPU"
+                                  }
+                                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-black transition ${
+                                    !specs.has_gpu_access
+                                      ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                                      : activeHardwareMode === "gpu"
+                                        ? "bg-[#ffe600] text-black cursor-pointer"
+                                        : "text-gray-700 hover:text-black cursor-pointer"
+                                  }`}
+                                >
+                                  <Zap className="w-3 h-3" />
+                                  <span>GPU Offload</span>
+                                  {!specs.has_gpu_access && (
+                                    <Lock className="w-2.5 h-2.5 text-gray-400 ml-0.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Feedback Notice */}
+                            {hardwareNotice ? (
+                              <div className="text-[10px] font-bold p-2 rounded-lg border border-black bg-[#ffe600] text-black flex items-center gap-1.5">
+                                <Info className="w-3 h-3 shrink-0" />
+                                <span>{hardwareNotice}</span>
+                              </div>
+                            ) : !specs.has_gpu_access && (
+                              <div className="text-[10px] text-gray-600 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 flex items-center gap-1.5">
+                                <Info className="w-3 h-3 text-amber-600 shrink-0" />
+                                <span>
+                                  <strong>Hardware Status:</strong>{" "}
+                                  {specs.gpu_disabled_reason ||
+                                    `${specs.hardware_adapter_name || specs.gpu_name || "GPU"} detected. Multi-threaded CPU mode active.`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* DENSE EMBEDDING ENGINE */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-black uppercase tracking-wider text-gray-700 block">
+                              Dense Embedding Model
+                            </label>
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-300">
+                              384 / 768-dim
+                            </span>
+                          </div>
+                          <select
+                            value={embeddingModel}
+                            onChange={(e) => setEmbeddingModel(e.target.value)}
+                            className="w-full bg-white font-mono text-xs font-bold border-2 border-black rounded-xl p-2.5 shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
+                          >
+                            <option value="all-MiniLM-L6-v2">
+                              all-MiniLM-L6-v2 (Ultra-Fast 5x • 80MB • CPU Friendly)
+                            </option>
+                            <option value="bge-small-en-v1.5">
+                              bge-small-en-v1.5 (Balanced 3x • 130MB • Standard PC)
+                            </option>
+                            <option value="bge-base-en-v1.5">
+                              bge-base-en-v1.5 (SOTA Precision • 430MB • 768-dim)
+                            </option>
+                            <option value="nomic-embed-text">
+                              nomic-embed-text (Ollama Native 8K • 768-dim)
+                            </option>
+                          </select>
+                        </div>
+
+                        {/* SESSION LIFETIME */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-black uppercase tracking-wider text-gray-700 block">
+                            Session Cache Lifetime
+                          </label>
+                          <select
+                            value={sessionLifetime}
+                            onChange={(e) => setSessionLifetime(e.target.value)}
+                            className="w-full bg-white font-mono text-xs font-bold border-2 border-black rounded-xl p-2.5 shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
+                          >
+                            <option value="1 Hour">1 Hour</option>
+                            <option value="3 Hours">3 Hours</option>
+                            <option value="24 Hours">24 Hours</option>
+                            <option value="Unlimited">Unlimited Persistent</option>
+                          </select>
+                        </div>
+
+                        {/* VISION OCR PIPELINE */}
+                        <div className="space-y-2 md:col-span-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                              <Eye className="w-3.5 h-3.5 text-black" />
+                              <span>Vision OCR & Diagram Reasoning Pipeline</span>
+                            </label>
+                            <span className="text-[10px] font-mono font-bold text-gray-500">
+                              {visionOCR ? `Active: ${selectedVisionModel}` : "Disabled"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {/* Option 1: moondream:latest */}
+                            <label
+                              onClick={() => {
+                                setVisionOCR(true);
+                                setSelectedVisionModel("moondream:latest");
+                                try {
+                                  localStorage.setItem("insightrag_vision_model", "moondream:latest");
+                                } catch {}
+                              }}
+                              className={`flex items-start gap-2.5 p-3 rounded-xl border-2 cursor-pointer font-mono transition-all ${
+                                visionOCR && selectedVisionModel === "moondream:latest"
+                                  ? "border-black bg-[#fffde6] shadow-[3px_3px_0px_#000]"
+                                  : "border-gray-300 bg-white hover:border-black"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="vision_model_choice"
+                                checked={visionOCR && selectedVisionModel === "moondream:latest"}
+                                onChange={() => {}}
+                                className="w-4 h-4 mt-0.5 accent-black cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-black text-black">moondream:latest</span>
+                                  <span className="bg-emerald-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded border border-black">
+                                    FAST OCR (800MB)
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-gray-600 font-medium mt-0.5">
+                                  Ultra-lightweight. Fast scanned text extraction & quick figure captioning on any CPU.
+                                </p>
+                              </div>
+                            </label>
+
+                            {/* Option 2: qwen2.5vl:3b */}
+                            <label
+                              onClick={() => {
+                                setVisionOCR(true);
+                                setSelectedVisionModel("qwen2.5vl:3b");
+                                try {
+                                  localStorage.setItem("insightrag_vision_model", "qwen2.5vl:3b");
+                                } catch {}
+                              }}
+                              className={`flex items-start gap-2.5 p-3 rounded-xl border-2 cursor-pointer font-mono transition-all ${
+                                visionOCR && selectedVisionModel === "qwen2.5vl:3b"
+                                  ? "border-black bg-purple-50 shadow-[3px_3px_0px_#000]"
+                                  : "border-gray-300 bg-white hover:border-black"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="vision_model_choice"
+                                checked={visionOCR && selectedVisionModel === "qwen2.5vl:3b"}
+                                onChange={() => {}}
+                                className="w-4 h-4 mt-0.5 accent-black cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-black text-purple-950">qwen2.5vl:3b</span>
+                                  <span className="bg-purple-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded border border-black">
+                                    SOTA MULTIMODAL (3.2GB)
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-purple-900 font-medium mt-0.5">
+                                  Deep diagram reasoning, flowchart OCR, architecture schematics & table parsing.
+                                </p>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* LOCAL ENGINE OFFLINE ADVISORY */}
+            {backendOnline === false && (
+              <div className="bg-[#fff9db] border-3 border-black p-4 sm:p-5 rounded-2xl shadow-[5px_5px_0px_#000] text-black font-mono space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded border border-black uppercase animate-pulse">
+                      LOCAL ENGINE OFFLINE
+                    </span>
+                    <h3 className="font-black text-sm sm:text-base">
+                      InsightRAG Runs 100% Privately On Your Device
+                    </h3>
+                  </div>
+                  <button
+                    onClick={loadSpecsAndStats}
+                    disabled={checkingHealth}
+                    className="cursor-pointer bg-black text-[#ffe600] hover:bg-neutral-800 text-xs font-black px-3 py-1.5 rounded-lg border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all self-start sm:self-auto"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${checkingHealth ? "animate-spin" : ""}`} />
+                    {checkingHealth ? "Checking..." : "Retry Connection"}
+                  </button>
+                </div>
+
+                <p className="text-xs text-neutral-800 leading-relaxed font-bold">
+                  Zero cloud server dependency. Your documents, FAISS vector embeddings, and LLM inferences remain strictly confidential on your PC. To index files, please start the local backend.
+                </p>
+
+                <div className="bg-black text-white p-3 sm:p-3.5 rounded-xl border-2 border-black space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-gray-300">
+                    <span className="flex items-center gap-1.5">
+                      <Terminal className="w-3.5 h-3.5 text-[#ffe600]" />
+                      <span>Quick 1-Line Setup (Windows PowerShell):</span>
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("irm https://www.insightrag.tech/install.ps1 | iex");
+                        setCopiedInstall(true);
+                        setTimeout(() => setCopiedInstall(false), 2000);
+                      }}
+                      className="text-[#ffe600] hover:underline flex items-center gap-1 text-[11px] font-black cursor-pointer"
+                    >
+                      {copiedInstall ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Command</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <code className="block bg-[#1a1a1a] p-2 rounded text-[#ffe600] text-xs font-mono select-all overflow-x-auto">
+                    irm https://www.insightrag.tech/install.ps1 | iex
+                  </code>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs pt-0.5">
+                  <span className="font-bold text-neutral-700">Already have InsightRAG on your PC? Run:</span>
+                  <span className="bg-white border-2 border-black px-2 py-0.5 rounded font-mono text-[11px] font-black shadow-[2px_2px_0px_#000]">
+                    run.bat
+                  </span>
+                  <span className="text-neutral-500 font-bold">or</span>
+                  <span className="bg-white border-2 border-black px-2 py-0.5 rounded font-mono text-[11px] font-black shadow-[2px_2px_0px_#000]">
+                    python scripts/run_local.py
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 4. DOCUMENT DROPZONE */}
+            <div className="pt-2 space-y-3">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDrag(true);
+                }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDrag(false);
+                  onSelectFiles(e.dataTransfer.files);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`group relative cursor-pointer rounded-2xl sm:rounded-3xl border-3 border-dashed p-8 sm:p-10 text-center transition-all duration-200 ${
+                  drag
+                    ? "border-black bg-[#fff9db] shadow-[6px_6px_0px_#000] scale-[1.01]"
+                    : "border-black bg-gradient-to-b from-white to-gray-50 hover:to-[#fffde6] shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-0.5"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.txt,.md,.csv,.json,.log,.rst,.html,.xml,.png,.jpg,.jpeg,.webp"
+                  className="hidden"
+                  onChange={(e) => onSelectFiles(e.target.files)}
+                />
+                <div className="mx-auto w-14 h-14 rounded-2xl bg-[#ffe600] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
+                  <Upload className="w-7 h-7 text-black stroke-[2.5]" />
+                </div>
+
+                <h2 className="text-lg sm:text-xl font-black font-mono text-black uppercase tracking-tight">
+                  Drop Research Documents, PDFs, or Scans Here
+                </h2>
+                <p className="text-xs font-mono text-gray-600 mt-1 font-semibold max-w-lg mx-auto">
+                  Click to browse files • Instant high-res OCR, vector chunking & diagram parsing
+                </p>
+
+                {/* Aesthetic format pills */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4 font-mono text-[10px] font-black">
+                  <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-md border border-red-300">
+                    PDF
+                  </span>
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-300">
+                    DOCX
+                  </span>
+                  <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-300">
+                    CSV / JSON
+                  </span>
+                  <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-md border border-gray-300">
+                    TXT / MD
+                  </span>
+                  <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md border border-purple-300">
+                    PNG / JPG / WEBP
+                  </span>
+                  <span className="bg-[#ffe600] text-black px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
+                    <SlidersHorizontal className="w-3 h-3" />
+                    <span>Custom Page Slicing</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Upload Status Banner */}
+              {uploadStatusMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-3.5 rounded-xl border-2 border-black font-mono text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-[2px_2px_0px_#000] ${
+                    !uploadStatusMsg.toLowerCase().includes("failed") &&
+                    !uploadStatusMsg.toLowerCase().includes("error") &&
+                    !uploadStatusMsg.toLowerCase().includes("offline")
+                      ? "bg-emerald-400 text-black"
+                      : "bg-red-400 text-black"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {!uploadStatusMsg.toLowerCase().includes("failed") &&
+                    !uploadStatusMsg.toLowerCase().includes("error") &&
+                    !uploadStatusMsg.toLowerCase().includes("offline") ? (
+                      <CheckCircle2 className="w-4 h-4 text-black shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-black shrink-0" />
+                    )}
+                    <span>{uploadStatusMsg}</span>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    {(uploadStatusMsg.toLowerCase().includes("failed") ||
+                      uploadStatusMsg.toLowerCase().includes("error") ||
+                      uploadStatusMsg.toLowerCase().includes("offline")) && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            "irm https://www.insightrag.tech/install.ps1 | iex",
+                          );
+                          setCopiedInstall(true);
+                          setTimeout(() => setCopiedInstall(false), 2000);
+                        }}
+                        className="cursor-pointer bg-black text-[#ffe600] hover:bg-neutral-800 text-[10px] font-black px-2 py-1 rounded border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1"
+                      >
+                        {copiedInstall ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span>Copied Launch Command</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Launch Command</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setUploadStatusMsg(null)}
+                      className="cursor-pointer font-black text-xs hover:opacity-75 p-1 rounded-md hover:bg-black/10 transition"
+                      title="Dismiss notice"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Upload Progress Bar */}
+            {uploading && (
+              <div className="bg-black text-white p-4 rounded-xl border-2 border-black space-y-2">
+                <div className="flex justify-between font-mono text-xs font-bold">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#ffe600] animate-spin" />
+                    Indexing documents into local vector database...
+                  </span>
+                  <span className="text-[#ffe600]">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-800 h-3 rounded-full overflow-hidden border border-gray-700">
+                  <div
+                    className="bg-[#ffe600] h-full transition-all duration-200"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Ingested Vector Index 3-Stat Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Stat 1: Documents */}
+              <div className="bg-white p-3.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between font-mono">
+                <div>
+                  <div className="text-[10px] font-black uppercase text-gray-500">
+                    Indexed Documents
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-black">
+                    {ragStats.files?.length || 0} File(s)
+                  </div>
+                </div>
+                <div className="h-9 w-9 rounded-xl bg-gray-100 border border-gray-300 flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-black" />
+                </div>
+              </div>
+
+              {/* Stat 2: Grounded Vectors */}
+              <div className="bg-white p-3.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between font-mono">
+                <div>
+                  <div className="text-[10px] font-black uppercase text-gray-500">
+                    Grounded Vectors
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-emerald-700">
+                    {ragStats.total_vectors || 0} Vectors
+                  </div>
+                </div>
+                <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-center">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                </div>
+              </div>
+
+              {/* Stat 3: Vector Store & Action */}
+              <div className="bg-white p-3.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between font-mono">
+                <div>
+                  <div className="text-[10px] font-black uppercase text-gray-500">
+                    Vector Database
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-black">
+                    FAISS Local Store
+                  </div>
+                </div>
+                {ragStats.total_vectors > 0 && (
+                  <button
+                    onClick={handleClearKnowledgeBase}
+                    className="text-[10px] font-mono font-black text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-300 transition shadow-[1px_1px_0px_#000]"
+                    title="Wipe entire vector index"
+                  >
+                    <Trash2 className="w-3 h-3 text-red-600" />
+                    <span>Clear All</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Indexed Knowledge Base Documents List with Individual Deletion */}
+            {ragStats.files && ragStats.files.length > 0 && (
+              <div className="bg-white border-2 border-black rounded-2xl p-4 shadow-[3px_3px_0px_#000] space-y-3 font-mono">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <span className="text-xs font-black uppercase text-gray-800 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-black" />
+                    <span>INDEXED DOCUMENTS ({ragStats.files.length})</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-bold">
+                    Delete individual files to re-index knowledge base
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {ragStats.files.map((file: any, fIdx: number) => (
+                    <div
+                      key={fIdx}
+                      className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-300 hover:border-black transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="bg-black text-[#ffe600] text-[9px] font-black px-1.5 py-0.5 rounded border border-black uppercase shrink-0">
+                          {file.extension ? file.extension.replace(".", "") : "DOC"}
+                        </span>
+                        <span
+                          className="truncate text-xs font-bold text-gray-900"
+                          title={file.name}
+                        >
+                          {file.name}
+                        </span>
+                        <span className="text-[10px] text-gray-500 shrink-0">
+                          ({(file.size_bytes / 1024).toFixed(0)} KB)
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteSingleDoc(file.name)}
+                        disabled={deletingDocName === file.name}
+                        title={`Delete ${file.name}`}
+                        className="p-1.5 bg-white hover:bg-red-50 text-gray-600 hover:text-red-600 rounded-lg border border-gray-300 hover:border-red-500 shadow-[1px_1px_0px_#000] transition active:scale-95 cursor-pointer shrink-0"
+                      >
+                        {deletingDocName === file.name ? (
+                          <Sparkles className="w-3.5 h-3.5 animate-spin text-red-500" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. GROUNDED KNOWLEDGE BASE READY BANNER & CHAT LAUNCHER */}
+            <div className="border-3 border-black rounded-2xl sm:rounded-3xl p-5 sm:p-6 bg-[#ffe600] shadow-[6px_6px_0px_#000] flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-black text-[#ffe600] flex items-center justify-center font-mono font-black text-xl shadow-[3px_3px_0px_#000] shrink-0">
+                  <Bot className="w-6 h-6 text-[#ffe600]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-mono font-black text-sm sm:text-base text-black uppercase tracking-tight">
+                      {ragStats.total_vectors > 0
+                        ? "Document Knowledge Base Ready"
+                        : "Document Knowledge Base Ready For Ingestion"}
+                    </h3>
+                    {ragStats.total_vectors > 0 && (
+                      <span className="bg-black text-emerald-400 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-black uppercase">
+                        Grounded
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs font-mono text-gray-800 mt-0.5">
+                    {ragStats.total_vectors > 0
+                      ? `${ragStats.files?.length || 0} document(s) fully parsed with tables, images & deep OCR • ${ragStats.total_vectors} vectors indexed.`
+                      : "Upload any document above to trigger the 5-phase deep parsing & understanding engine."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <button
+                  onClick={() => setActiveView("chat")}
+                  disabled={ragStats.total_vectors === 0}
+                  className="w-full md:w-auto bg-black hover:bg-gray-800 text-white disabled:opacity-50 disabled:cursor-not-allowed font-mono font-black text-xs sm:text-sm px-6 py-3.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                >
+                  <Bot className="w-4 h-4 text-[#ffe600]" />
+                  <span>Launch Full-Screen Chat Studio →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* 5.5 INTERACTIVE INGESTION & PAGE RANGE SCOPE MODAL */}
+      <AnimatePresence>
+        {showUploadModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="bg-white border-4 border-black rounded-3xl p-6 max-w-lg w-full shadow-[10px_10px_0px_#000] space-y-5 font-mono text-black"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b-2 border-gray-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#ffe600] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                    <Layers className="w-4 h-4 text-black" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black uppercase">
+                    Configure Document Scope
+                  </h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setPendingFiles([]);
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-lg border-2 border-transparent hover:border-black transition cursor-pointer"
+                >
+                  <X className="w-5 h-5 text-black hover:text-red-600" />
+                </button>
+              </div>
+
+              {/* Selected Files List */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-black uppercase text-gray-600 block">
+                  Selected File{pendingFiles.length > 1 ? "s" : ""} to Index ({pendingFiles.length})
+                </label>
+                <div className="max-h-32 overflow-y-auto space-y-1.5 p-2 bg-gray-50 border-2 border-black rounded-xl shadow-inner">
+                  {pendingFiles.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-xs font-bold bg-white border border-gray-300 px-3 py-1.5 rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <FileText className="w-3.5 h-3.5 text-[#e5a000] shrink-0" />
+                        <span className="truncate">{f.name}</span>
+                      </div>
+                      <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded border border-gray-300 shrink-0 font-mono">
+                        {(f.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scope Options */}
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase text-gray-600 block">
+                  Which Pages Do You Want to Ingest?
+                </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUsePageRange(false)}
+                    className={`p-3 rounded-xl border-2 border-black text-left transition flex flex-col justify-between cursor-pointer ${
+                      !usePageRange
+                        ? "bg-[#ffe600] shadow-[3px_3px_0px_#000] font-black"
+                        : "bg-white hover:bg-gray-50 shadow-[1px_1px_0px_#000] font-bold text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-black">All Pages</span>
+                      {!usePageRange && <CheckCircle2 className="w-4 h-4 text-black shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-gray-800 leading-tight">
+                      Full document parsing & chunking
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUsePageRange(true)}
+                    className={`p-3 rounded-xl border-2 border-black text-left transition flex flex-col justify-between cursor-pointer ${
+                      usePageRange
+                        ? "bg-[#ffe600] shadow-[3px_3px_0px_#000] font-black"
+                        : "bg-white hover:bg-gray-50 shadow-[1px_1px_0px_#000] font-bold text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-black">Custom Page Range</span>
+                      {usePageRange && <CheckCircle2 className="w-4 h-4 text-black shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-gray-800 leading-tight">
+                      Slice specific start & end pages
+                    </span>
+                  </button>
+                </div>
+
+                {/* Custom Page Range Inputs */}
+                {usePageRange && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-3.5 bg-yellow-50 border-2 border-black rounded-xl space-y-2.5 shadow-[2px_2px_0px_#000]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-black">PAGE RANGE RANGE SLICE</span>
+                      <span className="text-[10px] bg-black text-yellow-300 px-2 py-0.5 rounded font-mono font-bold">
+                        1-INDEXED
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-700 block mb-1">
+                          START PAGE
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={startPage}
+                          onChange={(e) =>
+                            setStartPage(
+                              e.target.value === ""
+                                ? ""
+                                : Math.max(1, parseInt(e.target.value) || 1),
+                            )
+                          }
+                          placeholder="1"
+                          className="w-full bg-white border-2 border-black rounded-lg p-2 font-mono text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-700 block mb-1">
+                          END PAGE
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={endPage}
+                          onChange={(e) =>
+                            setEndPage(
+                              e.target.value === ""
+                                ? ""
+                                : Math.max(1, parseInt(e.target.value) || 1),
+                            )
+                          }
+                          placeholder="e.g. 50 (or leave empty)"
+                          className="w-full bg-white border-2 border-black rounded-lg p-2 font-mono text-xs font-bold focus:outline-none shadow-[2px_2px_0px_#000]"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-600 font-bold leading-tight flex items-center gap-1">
+                      <Info className="w-3.5 h-3.5 inline text-black shrink-0" />
+                      <span>
+                        InsightRAG will only parse, extract text/tables/visuals, and embed vectors
+                        within pages {startPage || 1} to {endPage || "End"}.
+                      </span>
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t-2 border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setPendingFiles([]);
+                  }}
+                  className="bg-gray-200 hover:bg-gray-300 font-bold text-xs px-4 py-2.5 rounded-xl border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmUpload}
+                  className="bg-[#ffe600] hover:bg-yellow-400 text-black font-black text-xs px-5 py-2.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer flex items-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Start Indexing ({pendingFiles.length})</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. OPEN-SOURCE MODEL HUB & DOWNLOAD MODAL */}
+      <AnimatePresence>
+        {(showModelHubModal || showModal) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-4 border-black rounded-3xl p-5 sm:p-7 max-w-3xl w-full shadow-[10px_10px_0px_#000] space-y-5 font-mono text-black my-auto max-h-[90vh] overflow-y-auto"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b-3 border-black pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-black flex items-center justify-center text-[#ffe600] shadow-[2px_2px_0px_#000]">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black uppercase">
+                      Open-Source Model Hub
+                    </h3>
+                    <p className="text-[11px] text-gray-600 font-bold">
+                      Direct 1-Click Install & Seamless Model Switching
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowModelHubModal(false);
+                    setShowModal(false);
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-lg border-2 border-transparent hover:border-black transition cursor-pointer"
+                >
+                  <X className="w-6 h-6 text-black hover:text-red-600" />
+                </button>
+              </div>
+
+              {/* Modal Curated Stacked List */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-black" />
+                    <span>Curated Top-Tier Open-Source LLMs</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-bold">
+                    {CURATED_MODELS.length} Models Available
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
+                  {CURATED_MODELS.map((model) => {
+                    const isInstalled = isModelInstalled(model.id);
+                    const isActive = selectedLLM === model.id;
+                    const isPulling = pullingModelId === model.id;
+                    const progress = pullProgress[model.id] || 0;
+                    const statusText = pullStatusText[model.id] || "";
+
+                    return (
+                      <div
+                        key={model.id}
+                        className={`border-2 border-black rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[2px_2px_0px_#000] transition-all ${
+                          isActive
+                            ? "bg-emerald-50/90 border-emerald-600 ring-2 ring-emerald-500"
+                            : isInstalled
+                              ? "bg-gray-50/90 hover:bg-yellow-50/40"
+                              : "bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        {/* Left: Info, Name, Tags & Description */}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-black text-xs sm:text-sm text-black flex items-center gap-1.5">
+                              <span>{model.name}</span>
+                              {model.isVisionCapable && (
+                                <span title="Multimodal Vision & OCR Capable" className="inline-flex items-center text-purple-700">
+                                  <Eye className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              className={`text-[9px] font-mono font-black px-1.5 py-0.2 rounded border border-black ${model.badgeColor}`}
+                            >
+                              {model.badge}
+                            </span>
+                            <span className="text-[9px] font-mono font-black text-gray-600 bg-white px-1.5 py-0.2 rounded border border-gray-300">
+                              {model.size}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] font-mono text-gray-600 font-bold truncate">
+                            {model.tagline}
+                          </div>
+
+                          <p className="text-[10px] font-mono text-gray-500 leading-snug line-clamp-1 sm:line-clamp-2">
+                            {model.description}
+                          </p>
+                        </div>
+
+                        {/* Right: Action Button or Progress */}
+                        <div className="shrink-0 sm:min-w-[170px] flex items-center justify-end">
+                          {isPulling ? (
+                            <div className="w-full space-y-1">
+                              <div className="flex justify-between text-[10px] font-mono font-bold text-black">
+                                <span className="truncate max-w-[120px]">
+                                  {statusText || "Downloading..."}
+                                </span>
+                                <span>{progress}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 h-2.5 rounded-full border border-black overflow-hidden">
+                                <div
+                                  className="bg-[#ffe600] h-full transition-all duration-200"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : isActive ? (
+                            <div className="w-full flex items-center justify-center gap-1.5 bg-emerald-400 text-black py-2 px-3 rounded-xl border-2 border-black font-mono font-black text-xs shadow-[1px_1px_0px_#000]">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+                              <span>ACTIVE MODEL</span>
+                            </div>
+                          ) : isInstalled ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleSwitchModel(model.id);
+                                setShowModelHubModal(false);
+                                setShowModal(false);
+                              }}
+                              className="w-full bg-black hover:bg-gray-800 text-[#ffe600] py-2 px-3 rounded-xl border-2 border-black font-mono font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-[#ffe600]" />
+                              <span>Switch Model</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleInstallModel(model.id)}
+                              disabled={pullingModelId !== null}
+                              className="w-full bg-[#ffe600] hover:bg-yellow-400 disabled:opacity-50 text-black py-2 px-3 rounded-xl border-2 border-black font-mono font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Install ({model.size})</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Model Direct Pull */}
+              <div className="pt-3 border-t-2 border-gray-200 space-y-2">
+                <label className="text-xs font-black uppercase text-gray-700 block">
+                  Or Pull Any Custom Ollama Model Tag
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    placeholder="e.g. qwen2.5-coder:7b, gemma2:9b, etc."
+                    className="flex-1 bg-gray-50 border-2 border-black rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleInstallModel(customModel.trim())}
+                    disabled={!customModel.trim() || pullingModelId !== null}
+                    className="bg-[#ffe600] hover:bg-yellow-400 disabled:opacity-50 text-black font-black text-xs px-4 py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5 shrink-0 active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Pull Custom</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom Footer */}
+      <footer className="w-full border-2 border-black bg-white/95 backdrop-blur-md py-4 px-4 sm:px-6 mt-8 font-mono text-[11px] sm:text-xs text-gray-600 rounded-2xl shadow-[3px_3px_0px_#000]">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
+          <div className="font-bold text-black flex items-center gap-1.5 justify-center sm:justify-start">
+            <Sparkles className="w-3.5 h-3.5 text-black" />
+            <span>InsightRAG AI — Knowledge Base Studio</span>
+          </div>
+          <div className="bg-gray-100 px-3 py-1 rounded-full border border-gray-300">
+            Made by <a href="https://github.com/saurabh-ship-itt" target="_blank" rel="noreferrer" className="font-bold text-black hover:underline">Saurabh Malhotra</a>
+          </div>
+          <div className="text-gray-500">Zero-Budget Local Multimodal RAG</div>
+        </div>
+      </footer>
+    </div>
+  );
+}

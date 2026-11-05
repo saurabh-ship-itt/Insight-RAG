@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.tanstack/
+frontend/output/
+
+# IDE & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*
+serviceAccountKey.json
+*serviceAccountKey*.json
+backend/serviceAccountKey.json
+firebase-*.json
+
+# Dynamic User Uploads & Vector Indexes
+uploads/
+data/faiss_index/
+data/vector_store/
+insightforge.db
+rag_index.faiss
+rag_index.meta
+OllamaSetup.exe
+*.zip
+
+# Agent Metadata
+.agents/
+.claude/
+skills-lock.json
+
+.vercel
+.env*.local
+
+# Internal Analysis & Local Reports
+docs/*.pdf
+scripts/generate_architecture_comparison_pdf.py
+data/rag_feedback.json

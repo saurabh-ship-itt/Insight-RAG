@@ -1,0 +1,657 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Copy,
+  Check,
+  ArrowRight,
+  Terminal,
+  Cpu,
+  Shield,
+  Layers,
+  Sparkles,
+  ExternalLink,
+  BookOpen,
+  Code,
+  Zap,
+  Lock,
+  LogIn,
+  LogOut,
+  User as UserIcon,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "InsightRAG" },
+      {
+        name: "description",
+        content:
+          "Turn any documents, PDFs, diagrams, and images into a turnkey, anti-hallucination local AI knowledge studio with 100% on-device privacy.",
+      },
+    ],
+  }),
+  component: LandingPage,
+});
+
+/* ─── OS Platform Logos (inline SVGs) ─── */
+
+const WindowsLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 88 88" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.028 34.453L.028 71.58l-.026-25.65zm4.326-39.025L87.314 0v41.527l-47.318.376zm47.329 39.349l-.011 41.34-47.318-6.678-.066-34.739z" />
+  </svg>
+);
+
+const AppleLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 384 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+  </svg>
+);
+
+const LinuxLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68a1.22 1.22 0 00-.112.49c0 .21.04.413.107.566.067.152.159.283.261.39.103.11.218.19.342.253.124.062.263.095.399.095h.005c.044 0 .088-.002.131-.006.375-.04.645-.243.888-.478.063-.06.122-.13.184-.193.063.033.125.075.187.108.393.202.8.31 1.201.322.202.01.39-.02.575-.074.075.127.163.235.273.322.186.15.402.234.626.264.42.063.847-.058 1.17-.347.084-.075.158-.16.229-.244l.017.012c.063.06.128.12.195.175.337.275.768.436 1.167.404a1.347 1.347 0 00.696-.255c.077-.052.15-.113.217-.18.067.06.139.116.21.173a1.36 1.36 0 00.858.287 1.47 1.47 0 00.463-.073c.16-.054.315-.142.452-.252.092-.074.18-.155.262-.243l.022.012c.086.098.181.185.288.258.249.168.526.265.826.265h.006c.148 0 .297-.024.44-.071a1.42 1.42 0 00.404-.214c.084-.064.163-.138.236-.218.283.158.607.253.946.253.355 0 .697-.105.985-.298a1.47 1.47 0 00.468-.44c.08.038.16.07.243.097.125.04.255.06.387.06h.005c.168 0 .337-.035.497-.096a1.36 1.36 0 00.43-.262 1.37 1.37 0 00.288-.348c.065-.122.108-.257.125-.396l.005-.038c.012-.138-.002-.28-.042-.417a1.42 1.42 0 00-.183-.4 1.74 1.74 0 00-.159-.2c.038-.097.066-.2.083-.307.033-.203.017-.413-.05-.605-.055-.16-.139-.305-.24-.432-.062-.077-.131-.148-.2-.22.089-.163.16-.34.206-.525.06-.242.07-.498.022-.747a2.078 2.078 0 00-.254-.673c-.105-.17-.226-.32-.365-.446l.002-.001c.142-.398.225-.82.225-1.262 0-.705-.197-1.357-.534-1.912.072-.168.127-.347.157-.534.049-.305.034-.617-.04-.908a2.72 2.72 0 00-.319-.733 3.545 3.545 0 00-.547-.685 5.312 5.312 0 00-.72-.611 7.671 7.671 0 00-.84-.531 10.24 10.24 0 00-.902-.43c-.16-.07-.32-.127-.468-.175a.52.52 0 01-.11-.064c-.103-.084-.18-.212-.244-.35a2.23 2.23 0 01-.16-.556c-.04-.213-.065-.45-.078-.716a7.988 7.988 0 01.008-1.003c.018-.236.044-.484.072-.729.103-.9.186-1.816-.017-2.58-.157-.585-.443-1.073-.87-1.395C13.273.12 12.85 0 12.504 0z" />
+  </svg>
+);
+
+/* ─── Platform Configurations ─── */
+
+type PlatformKey = "windows" | "macos" | "linux";
+
+interface PlatformConfig {
+  id: PlatformKey;
+  label: string;
+  icon: typeof WindowsLogo;
+  prompt: string;
+  command: string;
+  shellName: string;
+  accentColor: string;
+  bgGlow: string;
+}
+
+const platforms: PlatformConfig[] = [
+  {
+    id: "windows",
+    label: "Windows",
+    icon: WindowsLogo,
+    prompt: "PS>",
+    command: "irm https://www.insightrag.tech/install.ps1 | iex",
+    shellName: "PowerShell",
+    accentColor: "#0078D4",
+    bgGlow: "rgba(0, 120, 212, 0.15)",
+  },
+  {
+    id: "macos",
+    label: "macOS",
+    icon: AppleLogo,
+    prompt: "$",
+    command: "curl -fsSL https://www.insightrag.tech/install.sh | bash",
+    shellName: "Terminal",
+    accentColor: "#A2AAAD",
+    bgGlow: "rgba(162, 170, 173, 0.15)",
+  },
+  {
+    id: "linux",
+    label: "Linux",
+    icon: LinuxLogo,
+    prompt: "$",
+    command: "curl -fsSL https://www.insightrag.tech/install.sh | sh",
+    shellName: "Terminal",
+    accentColor: "#FCC624",
+    bgGlow: "rgba(252, 198, 36, 0.15)",
+  },
+];
+
+/* ─── Animation Variants ─── */
+
+const commandVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 60 : -60,
+    opacity: 0,
+    scale: 0.95,
+    filter: "blur(6px)",
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    scale: 1,
+    filter: "blur(0px)",
+  },
+  exit: (direction: number) => ({
+    x: direction < 0 ? 60 : -60,
+    opacity: 0,
+    scale: 0.95,
+    filter: "blur(6px)",
+  }),
+};
+
+const shellInfoVariants = {
+  enter: { opacity: 0, y: 8 },
+  center: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
+
+function LandingPage() {
+  const { user, openAuthModal, logout } = useAuth();
+  const [copied, setCopied] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<PlatformKey>("windows");
+  const [direction, setDirection] = useState(0);
+
+  const currentPlatform = platforms.find((p) => p.id === activePlatform)!;
+
+  const handlePlatformSwitch = (platformId: PlatformKey) => {
+    if (platformId === activePlatform) return;
+    const currentIndex = platforms.findIndex((p) => p.id === activePlatform);
+    const nextIndex = platforms.findIndex((p) => p.id === platformId);
+    setDirection(nextIndex > currentIndex ? 1 : -1);
+    setActivePlatform(platformId);
+    setCopied(false);
+  };
+
+  const handleCopyCLI = () => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    navigator.clipboard.writeText(currentPlatform.command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-[#ffe600] selection:text-black overflow-x-hidden">
+      {/* 
+        ========================================================================
+        HERO SECTION (Sky Noise Textured Background - Responsive Neo-Brutalist)
+        ========================================================================
+      */}
+      <div
+        className="relative bg-cover bg-center bg-no-repeat border-b-4 border-black min-h-[92vh] flex flex-col justify-between"
+        style={{
+          backgroundImage: `url('/assets/skytextured.jpg'), url('/skytextured.jpg')`,
+          backgroundColor: "#86b0d9",
+        }}
+      >
+        {/* Top Navbar */}
+        <header className="p-3 sm:p-5 md:p-6 max-w-7xl mx-auto w-full z-30">
+          <div className="flex items-center justify-between gap-2 sm:gap-4 relative">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2 group z-10">
+              <span className="bg-[#ffe600] text-black font-black font-mono text-base sm:text-lg md:text-xl px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] italic tracking-tighter hover:bg-yellow-400 transition-colors">
+                InsightRAG
+              </span>
+            </Link>
+
+            {/* Desktop / Tablet Navigation Pill — Centered */}
+            <nav className="hidden sm:flex items-center gap-1 md:gap-1.5 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1.5 md:py-2 rounded-full border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] font-mono text-[11px] md:text-xs font-bold text-black absolute left-1/2 -translate-x-1/2 z-20">
+              <a
+                href="#capabilities"
+                className="px-3 py-1 rounded-full hover:bg-[#ffe600] hover:shadow-[1px_1px_0px_#000] transition-all duration-150 text-black"
+              >
+                Capabilities
+              </a>
+              <Link
+                to="/docs"
+                className="px-3 py-1 rounded-full hover:bg-[#ffe600] hover:shadow-[1px_1px_0px_#000] transition-all duration-150 text-black font-black"
+              >
+                Docs
+              </Link>
+              <a
+                href="https://github.com/saurabh-ship-itt/Insight-RAG"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1 rounded-full hover:bg-[#ffe600] hover:shadow-[1px_1px_0px_#000] transition-all duration-150 flex items-center gap-1 text-black"
+              >
+                <Code className="w-3.5 h-3.5" />
+                <span>GitHub</span>
+              </a>
+            </nav>
+
+            {/* Top Right Action Button - User Auth / Sign In */}
+            <div className="flex items-center gap-2 z-10">
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-black/90 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg border-2 border-black shadow-[2px_2px_0px_#ffe600]">
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="User Avatar"
+                        className="w-5 h-5 rounded-full border border-yellow-400 object-cover"
+                      />
+                    ) : (
+                      <UserIcon className="w-4 h-4 text-[#ffe600]" />
+                    )}
+                    <span className="hidden sm:inline font-bold max-w-[100px] truncate text-white">
+                      {user.displayName || user.email?.split("@")[0] || "User"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={logout}
+                    title="Sign Out"
+                    className="bg-[#1a1a1a] text-gray-300 hover:text-white hover:bg-red-950/80 font-mono text-[11px] px-2.5 py-1.5 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1 cursor-pointer transition active:scale-95"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-red-400" />
+                    <span className="hidden xs:inline">LOGOUT</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={openAuthModal}
+                  className="bg-[#ffe600] text-black hover:bg-yellow-400 font-mono font-black text-[11px] sm:text-xs px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-black" />
+                  <span>SIGN IN</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Quick Links Bar (< sm) */}
+          <div className="sm:hidden mt-2 flex items-center justify-center gap-2 bg-white/95 backdrop-blur-md px-3 py-1 rounded-lg border border-black text-[11px] font-mono font-bold text-black shadow-[1px_1px_0px_#000]">
+            <Link to="/docs" className="px-2 py-0.5 hover:underline font-black flex items-center gap-1">
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Docs</span>
+            </Link>
+            <span className="text-gray-300">|</span>
+            <a href="#capabilities" className="px-2 py-0.5 hover:underline flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-[#ffe600]" />
+              <span>Features</span>
+            </a>
+            <span className="text-gray-300">|</span>
+            <a
+              href="https://github.com/saurabh-ship-itt/Insight-RAG"
+              target="_blank"
+              rel="noreferrer"
+              className="px-2 py-0.5 hover:underline flex items-center gap-1"
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>GitHub</span>
+            </a>
+          </div>
+        </header>
+
+        {/* Hero Central Content */}
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 md:py-12 text-center space-y-4 sm:space-y-6 z-10 my-auto w-full">
+          {/* Eyebrow Badge */}
+          <div className="inline-block bg-black text-[#ffe600] font-mono font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] uppercase tracking-wider max-w-full">
+            UNIVERSAL MULTIMODAL RAG & INTELLIGENCE FACTORY
+          </div>
+
+          {/* Display Headline */}
+          <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black font-sans tracking-tight leading-[1.08] sm:leading-[1.05] px-1">
+            <span
+              className="text-[#ffe600] inline-block drop-shadow-[0_3px_6px_rgba(0,0,0,0.75)]"
+              style={{
+                WebkitTextStroke: "2.5px #000000",
+                paintOrder: "stroke fill",
+              }}
+            >
+              Autonomous Multimodal
+            </span>{" "}
+            <br className="hidden xs:inline" />
+            <span className="bg-[#ffe600] text-black px-2 py-0.5 rounded border-2 border-black inline-block shadow-[3px_3px_0px_#000] sm:shadow-[4px_4px_0px_#000] mt-1 text-2xl xs:text-3xl sm:text-5xl md:text-6xl lg:text-7xl">
+              RAG-in-a-Box Factory
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="max-w-2xl mx-auto text-black font-mono font-bold text-xs sm:text-sm md:text-base leading-relaxed bg-white/80 backdrop-blur-sm p-3 sm:p-4 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000]">
+            Turn complex manuals, technical blueprints, research papers, diagrams, books, and
+            enterprise documents into a turnkey, anti-hallucination AI knowledge studio in seconds.
+          </p>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              MULTI-PLATFORM INSTALL COMMAND BOX WITH OS SWITCHER
+              ═══════════════════════════════════════════════════════════════════ */}
+          <div className="max-w-2xl mx-auto bg-black text-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000] sm:shadow-[6px_6px_0px_#000] font-mono text-xs sm:text-sm text-left overflow-hidden">
+            
+            {/* ── Header Row ── */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800 px-3 sm:px-4 pt-3 sm:pt-4 pb-2">
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
+                <span className="text-[#ffe600] font-black flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-[#ffe600]" />
+                  <span>1-LINE INSTALL</span>
+                </span>
+                <span className="text-gray-500">|</span>
+                <span className="text-emerald-400 font-bold">100% Local Air-Gapped</span>
+              </div>
+              <span className="text-[9px] bg-[#1a1a1a] text-gray-300 px-2 py-0.5 rounded border border-gray-700">
+                Zero Setup Bills
+              </span>
+            </div>
+
+            {/* ── OS Platform Tabs ── */}
+            <div className="px-3 sm:px-4 pt-3">
+              <div className="flex items-center gap-1 bg-[#0d1117] rounded-xl p-1 border border-gray-800">
+                {platforms.map((platform) => {
+                  const Icon = platform.icon;
+                  const isActive = activePlatform === platform.id;
+                  return (
+                    <button
+                      key={platform.id}
+                      onClick={() => handlePlatformSwitch(platform.id)}
+                      className="relative flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg font-black text-[10px] sm:text-xs cursor-pointer transition-colors duration-200"
+                      style={{
+                        color: isActive ? "#000" : "#9ca3af",
+                      }}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="os-tab-indicator"
+                          className="absolute inset-0 rounded-lg"
+                          style={{
+                            background: "#ffe600",
+                            boxShadow: `0 0 20px ${platform.bgGlow}, inset 0 1px 0 rgba(255,255,255,0.1)`,
+                          }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 30,
+                          }}
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center gap-1.5 sm:gap-2">
+                        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>{platform.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Command Display Area (animated or locked if not signed in) ── */}
+            <div className="px-3 sm:px-4 pt-2.5 pb-1">
+              <div
+                className="relative rounded-xl border border-gray-800 overflow-hidden transition-colors duration-500"
+                style={{
+                  background: `linear-gradient(135deg, ${currentPlatform.bgGlow}, #0d1117 60%)`,
+                }}
+              >
+                {/* Subtle accent glow bar at top */}
+                <motion.div
+                  className="absolute top-0 left-0 right-0 h-[2px]"
+                  style={{ background: currentPlatform.accentColor }}
+                  layoutId="os-glow-bar"
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                />
+
+                {user ? (
+                  <div className="flex items-center gap-2 justify-between p-2 sm:px-3 sm:py-2.5 min-h-[44px]">
+                    <AnimatePresence mode="wait" custom={direction}>
+                      <motion.div
+                        key={activePlatform}
+                        custom={direction}
+                        variants={commandVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={{
+                          x: { type: "spring", stiffness: 500, damping: 35 },
+                          opacity: { duration: 0.2 },
+                          scale: { duration: 0.2 },
+                          filter: { duration: 0.25 },
+                        }}
+                        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto text-emerald-400 font-bold flex-1 min-w-0 scrollbar-none"
+                      >
+                        <span
+                          className="flex-shrink-0 text-xs font-mono font-black"
+                          style={{ color: currentPlatform.accentColor }}
+                        >
+                          {currentPlatform.prompt}
+                        </span>
+                        <code className="whitespace-nowrap text-[10px] sm:text-xs text-emerald-300">
+                          {currentPlatform.command}
+                        </code>
+                      </motion.div>
+                    </AnimatePresence>
+
+                    <button
+                      onClick={handleCopyCLI}
+                      className="bg-[#ffe600] text-black font-black font-mono text-[10px] sm:text-xs px-2.5 sm:px-3.5 py-1.5 rounded-lg border-2 border-black hover:bg-yellow-400 cursor-pointer flex-shrink-0 flex items-center gap-1 ml-1 sm:ml-2 active:scale-95 transition"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? "COPIED!" : "COPY"}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 sm:px-4 sm:py-3.5 bg-black/75 backdrop-blur-md min-h-[50px]">
+                    <div className="flex items-center gap-2 text-gray-300 text-xs font-mono">
+                      <Lock className="w-4 h-4 text-[#ffe600] shrink-0 animate-pulse" />
+                      <span>
+                        <span className="text-[#ffe600] font-black">ACCESS LOCKED:</span> Sign in to unlock the 1-Line {currentPlatform.shellName} command.
+                      </span>
+                    </div>
+                    <button
+                      onClick={openAuthModal}
+                      className="bg-[#ffe600] text-black hover:bg-yellow-400 font-mono font-black text-xs px-3.5 py-1.5 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition active:scale-95 shrink-0"
+                    >
+                      <LogIn className="w-3.5 h-3.5 text-black" />
+                      <span>SIGN IN TO UNLOCK</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Bottom Info Row (animated per platform) ── */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400 font-mono px-3 sm:px-4 pb-3 sm:pb-4 pt-1">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={`shell-${activePlatform}`}
+                  variants={shellInfoVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-1"
+                >
+                  <Terminal className="w-3 h-3 text-[#ffe600]" />
+                  <span>
+                    Paste &amp; run in{" "}
+                    <strong className="text-white">{currentPlatform.shellName}</strong>
+                    {currentPlatform.id !== "windows" && (
+                      <span className="text-gray-500 ml-1">(or any POSIX shell)</span>
+                    )}
+                  </span>
+                </motion.span>
+              </AnimatePresence>
+              <span className="text-[#ffe600] font-bold">Auto-launches Studio upon completion</span>
+            </div>
+          </div>
+
+          {/* Action Buttons (Mobile stacked, tablet/desktop row) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-1 sm:pt-2 max-w-md sm:max-w-none mx-auto">
+            <button
+              onClick={handleCopyCLI}
+              className="w-full sm:w-auto bg-[#ffe600] text-black hover:bg-yellow-400 font-black font-mono text-xs sm:text-sm px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl border-3 border-black shadow-[3px_3px_0px_#000] sm:shadow-[5px_5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[2px] active:translate-y-[2px]"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
+              ) : (
+                <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
+              )}
+              <span>{copied ? "COPIED 1-LINE COMMAND!" : "COPY 1-LINE LAUNCH COMMAND"}</span>
+            </button>
+
+            <Link to="/docs" className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto bg-[#0d1117] text-white hover:bg-gray-900 font-black font-mono text-xs sm:text-sm px-6 sm:px-7 py-3.5 sm:py-4 rounded-xl border-3 border-black shadow-[3px_3px_0px_#000] sm:shadow-[5px_5px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[2px] active:translate-y-[2px]">
+                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                <span>EXPLORE DOCS</span>
+              </button>
+            </Link>
+          </div>
+        </main>
+
+        {/* Bottom Ticker Marquee Bar */}
+        <div className="bg-black text-[#ffe600] border-t-4 border-black py-2 sm:py-2.5 overflow-hidden font-mono text-[10px] sm:text-xs font-black tracking-widest uppercase z-10 select-none flex">
+          <motion.div
+            className="flex items-center gap-6 sm:gap-8 whitespace-nowrap shrink-0"
+            animate={{ x: ["0%", "-50%"] }}
+            transition={{
+              ease: "linear",
+              duration: 25,
+              repeat: Infinity,
+            }}
+          >
+            <span>
+              UNIVERSAL MULTIMODAL RAG • TECHNICAL BLUEPRINTS & MANUALS • SCIENTIFIC RESEARCH
+              PAPERS • ENTERPRISE BOOKS & REPORTS • FOCUSED DIAGRAM & ROI OCR • 100% PRIVATE
+              ON-DEVICE FAISS • ZERO DATA LEAKS • HARDWARE ACCELERATED
+            </span>
+            <span>
+              UNIVERSAL MULTIMODAL RAG • TECHNICAL BLUEPRINTS & MANUALS • SCIENTIFIC RESEARCH
+              PAPERS • ENTERPRISE BOOKS & REPORTS • FOCUSED DIAGRAM & ROI OCR • 100% PRIVATE
+              ON-DEVICE FAISS • ZERO DATA LEAKS • HARDWARE ACCELERATED
+            </span>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* 
+        ========================================================================
+        NEO-BRUTALIST 3-CARD SECTION
+        ========================================================================
+      */}
+      <section
+        id="capabilities"
+        className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 max-w-6xl mx-auto space-y-8 sm:space-y-12"
+      >
+        <div className="text-center space-y-2 sm:space-y-3">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black font-sans text-white tracking-tight">
+            Deterministic Precision. Zero Fluff.
+          </h2>
+          <p className="text-zinc-400 font-mono text-xs sm:text-sm max-w-xl mx-auto px-2">
+            100% air-gapped local intelligence with strict source grounding and zero cloud leakage.
+          </p>
+        </div>
+
+        {/* 3 Neo-Brutalist Cards Grid (1 col mobile, 2 col tablet, 3 col desktop) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+          {/* Card 1: MULTIMODAL (Yellow Card) */}
+          <div className="bg-[#ffe600] text-black border-4 border-black rounded-2xl sm:rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-6 shadow-[6px_6px_0px_#ffe600] sm:shadow-[8px_8px_0px_#ffe600] hover:translate-y-[-4px] transition-transform">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2 sm:pb-3">
+                <h3 className="text-xl sm:text-2xl font-black font-mono uppercase tracking-tight">
+                  VISION + OCR
+                </h3>
+                <span className="w-3.5 h-3.5 bg-black rounded-sm" />
+              </div>
+              <p className="font-mono text-xs font-bold leading-relaxed text-black/90">
+                Deep visual extraction for complex schematics, diagrams, flowcharts, and
+                multilingual scans via local Vision LLMs and sub-region ROI slicing.
+              </p>
+            </div>
+
+            <div className="bg-white border-2 border-black rounded-xl p-2.5 sm:p-3 font-mono text-xs font-black text-black shadow-[2px_2px_0px_#000] text-center">
+              RapidOCR + Vision LLM + ROI
+            </div>
+          </div>
+
+          {/* Card 2: GUARDRAILS (Green Card) */}
+          <div className="bg-[#22c55e] text-black border-4 border-black rounded-2xl sm:rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-6 shadow-[6px_6px_0px_#ffe600] sm:shadow-[8px_8px_0px_#ffe600] hover:translate-y-[-4px] transition-transform">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2 sm:pb-3">
+                <h3 className="text-xl sm:text-2xl font-black font-mono uppercase tracking-tight">
+                  FACTUAL SHIELD
+                </h3>
+                <span className="w-3.5 h-3.5 bg-black rounded-sm" />
+              </div>
+              <p className="font-mono text-xs font-bold leading-relaxed text-black/90">
+                Strict cosine distance gating, HyDE query expansion, and zero-evidence refusal
+                protocols eliminate hallucinations completely.
+              </p>
+            </div>
+
+            <div className="bg-white border-2 border-black rounded-xl p-2.5 sm:p-3 font-mono text-xs font-black text-black shadow-[2px_2px_0px_#000] text-center">
+              Cosine Filter + HyDE Expander
+            </div>
+          </div>
+
+          {/* Card 3: STANDALONE (Pink Card) */}
+          <div className="bg-[#ec4899] text-black border-4 border-black rounded-2xl sm:rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-6 shadow-[6px_6px_0px_#ffe600] sm:shadow-[8px_8px_0px_#ffe600] hover:translate-y-[-4px] transition-transform">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2 sm:pb-3">
+                <h3 className="text-xl sm:text-2xl font-black font-mono uppercase tracking-tight">
+                  PORTABLE BUNDLE
+                </h3>
+                <span className="w-3.5 h-3.5 bg-black rounded-sm" />
+              </div>
+              <p className="font-mono text-xs font-bold leading-relaxed text-black/90">
+                Compile and export your indexed knowledge into a standalone, air-gapped production
+                package with embedded ChromaDB, FastAPI, and UI.
+              </p>
+            </div>
+
+            <div className="bg-white border-2 border-black rounded-xl p-2.5 sm:p-3 font-mono text-xs font-black text-black shadow-[2px_2px_0px_#000] text-center">
+              FastAPI + ChromaDB + UI
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 
+        ========================================================================
+        ABOUT US SECTION
+        ========================================================================
+      */}
+      <section className="border-t-4 border-white bg-black py-12 sm:py-16 md:py-20 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 items-center">
+          {/* Left Description Column */}
+          <div className="space-y-4 sm:space-y-6">
+            <h2 className="text-2xl sm:text-3xl font-black font-mono text-white uppercase tracking-wider">
+              ABOUT US
+            </h2>
+
+            <p className="font-mono text-xs sm:text-sm text-gray-300 font-bold leading-relaxed uppercase">
+              THE CREATION OF THE INSIGHTRAG ENGINE WAS DRIVEN BY THE NEED FOR PRIVATE, ZERO-COST,
+              AND UNCOMPROMISING LOCAL ARTIFICIAL INTELLIGENCE. WE BUILT A HIGH-PERFORMANCE
+              ARCHITECTURE CAPABLE OF PROCESSING MULTI-FORMAT DOCUMENTS, TECHNICAL BLUEPRINTS,
+              RESEARCH PAPERS, AND VISUAL MEDIA WITH STRICT ANTI-HALLUCINATION GUARDRAILS AND
+              1-CLICK STANDALONE DEPLOYMENT.
+            </p>
+
+            <button
+              onClick={handleCopyCLI}
+              className="bg-white text-black hover:bg-[#ffe600] font-mono font-black text-xs px-5 sm:px-6 py-2.5 sm:py-3 rounded-full border-2 border-white shadow-[3px_3px_0px_#fff] flex items-center gap-2 cursor-pointer transition-colors active:scale-95"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 text-black" />
+              ) : (
+                <Copy className="w-4 h-4 text-black" />
+              )}
+              <span>COPY CLI LAUNCH</span>
+            </button>
+          </div>
+
+          {/* Right Text Graphic Column */}
+          <div className="flex items-center justify-center py-4 sm:py-0">
+            <div className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black font-sans tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-400 to-gray-800 select-none text-center md:text-left">
+              INSIGHT
+              <br />
+              RAG
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom Footer (Optimized for mobile & tablet) */}
+      <footer className="border-t-2 border-gray-800 bg-black py-6 sm:py-8 px-4 sm:px-6 font-mono text-[11px] sm:text-xs text-gray-400">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-center sm:text-left">
+          <div className="font-bold text-gray-300 flex items-center gap-1.5 justify-center sm:justify-start">
+            <Sparkles className="w-3.5 h-3.5 text-[#ffe600]" />
+            <span>InsightRAG — Autonomous Multimodal RAG Engine</span>
+          </div>
+          <div className="text-gray-400 py-1 px-3 bg-gray-950 rounded-full border border-gray-800">
+            Made by <a href="https://github.com/saurabh-ship-itt" target="_blank" rel="noreferrer" className="text-gray-100 font-bold hover:underline">Saurabh Malhotra</a>
+          </div>
+          <div className="text-gray-500">
+            © {new Date().getFullYear()} InsightRAG AI. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

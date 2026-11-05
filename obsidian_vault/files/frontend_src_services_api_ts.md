@@ -1,0 +1,32 @@
+---
+tags:
+  - #code
+  - #frontend
+---
+# 📄 `api.ts`
+
+> **File Path**: `frontend\src\services\api.ts`
+> **Parent Hub**: [[06_Frontend_App_Hub]] | **Master Hub**: [[00_Master_Hub]]
+
+---
+
+## 🔗 Connected Dependencies & Imported Modules
+- Main Subsystem Hub: [[06_Frontend_App_Hub]]
+- *Standalone / Top-level Module*
+
+---
+
+## ⚙️ Key Symbols & Interfaces
+- `export interface RAGTaskStatus {`
+- `export interface PullModelCallbacks {`
+- `export interface StreamCallbacks {`
+
+---
+
+## 💬 Token-Saving AI Summary
+```text
+Module: frontend\src\services\api.ts (427 lines)
+Tags: #code, #frontend
+Hub: 06_Frontend_App_Hub
+Exports: export interface RAGTaskStatus {, export interface PullModelCallbacks {, export interface StreamCallbacks {
+```

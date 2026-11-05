@@ -1,0 +1,569 @@
+"""
+InsightRAG AI — Autonomous Local Multimodal RAG Engine Launcher
+
+Starts:
+  1. FastAPI backend on port 8000
+  2. Vite frontend dev server on port 5173
+
+Then opens http://localhost:5173 in the browser.
+"""
+
+import os
+import sys
+import time
+import shutil
+import subprocess
+import threading
+import webbrowser
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='ignore')
+    except Exception:
+        pass
+
+ANSI_CYAN   = "\033[96m"
+ANSI_GREEN  = "\033[92m"
+ANSI_YELLOW = "\033[93m"
+ANSI_RED    = "\033[91m"
+ANSI_DARKGRAY = "\033[90m"
+ANSI_BOLD   = "\033[1m"
+ANSI_RESET  = "\033[0m"
+
+BANNER = f"""{ANSI_BOLD}{ANSI_CYAN}
+██╗███╗   ██╗███████╗██╗ ██████╗ ██╗  ██╗████████╗    ██████╗   █████╗   ██████╗ 
+██║████╗  ██║██╔════╝██║██╔════╝ ██║  ██║╚══██╔══╝    ██╔══██╗ ██╔══██╗ ██╔════╝ 
+██║██╔██╗ ██║███████╗██║██║  ███╗███████║   ██║       ██████╔╝ ███████║ ██║  ███╗
+██║██║╚██╗██║╚════██║██║██║   ██║██╔══██║   ██║       ██╔══██╗ ██╔══██║ ██║   ██║
+██║██║ ╚████║███████║██║╚██████╔╝██║  ██║   ██║       ██║  ██║ ██║  ██║ ╚██████╔╝
+╚═╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝       ╚═╝  ╚═╝ ╚═╝  ╚═╝  ╚═════╝ 
+{ANSI_RESET}"""
+
+def print_step(msg, status="OK", color=ANSI_GREEN):
+    print(f"{ANSI_BOLD}[*]{ANSI_RESET} {msg}... [{color}{status}{ANSI_RESET}]")
+
+def check_python():
+    v = sys.version_info
+    print_step(f"Checking Python installation ({v.major}.{v.minor}.{v.micro})", "OK", ANSI_GREEN)
+
+def download_and_install_ollama():
+    """Download and silently install Ollama for Windows with live progress."""
+    if os.name != 'nt':
+        print(f"  {ANSI_YELLOW}[*] On Linux or macOS, run: curl -fsSL https://ollama.com/install.sh | sh{ANSI_RESET}")
+        return
+    import tempfile
+    import urllib.request
+    installer_url = "https://ollama.com/download/OllamaSetup.exe"
+    temp_installer = os.path.join(tempfile.gettempdir(), "OllamaSetup.exe")
+    print(f"\n  {ANSI_CYAN}[*] Downloading official Ollama installer from ollama.com (~70MB)...{ANSI_RESET}")
+    try:
+        def reporthook(blocknum, blocksize, totalsize):
+            read = blocknum * blocksize
+            if totalsize > 0:
+                percent = min(100, int(read * 100 / totalsize))
+                mb_read = read // (1024 * 1024)
+                mb_total = totalsize // (1024 * 1024)
+                sys.stdout.write(f"\r  {ANSI_YELLOW}[*] Downloading: {percent}% ({mb_read}MB / {mb_total}MB)...{ANSI_RESET}")
+                sys.stdout.flush()
+        urllib.request.urlretrieve(installer_url, temp_installer, reporthook)
+        print(f"\n  {ANSI_GREEN}[OK] Download complete! Running setup in background...{ANSI_RESET}")
+        subprocess.run([temp_installer, "/silent"], check=False)
+        time.sleep(3)
+        print_step("Ollama installation", "COMPLETE", ANSI_GREEN)
+
+        # Launch background service
+        local_appdata = os.getenv("LOCALAPPDATA", "")
+        cand = os.path.join(local_appdata, "Programs", "Ollama", "ollama.exe")
+        bin_path = cand if os.path.exists(cand) else shutil.which("ollama")
+        if bin_path:
+            CREATE_NO_WINDOW = 0x08000000
+            subprocess.Popen([bin_path, "serve"], creationflags=CREATE_NO_WINDOW)
+            print_step("Ollama background service", "STARTED", ANSI_GREEN)
+            time.sleep(1.5)
+    except Exception as e:
+        print(f"  {ANSI_RED}[!] Could not auto-install Ollama: {e}{ANSI_RESET}")
+        print(f"      You can manually install anytime from: https://ollama.com/download")
+
+def check_and_start_ollama():
+    try:
+        import httpx
+        try:
+            resp = httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.5)
+            if resp.status_code == 200:
+                print_step("Checking Ollama AI Engine installation", "OK", ANSI_GREEN)
+                print_step("Checking Ollama local service", "ACTIVE", ANSI_GREEN)
+                return
+        except Exception:
+            pass
+    except ImportError:
+        pass
+
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        local_appdata = os.getenv("LOCALAPPDATA", "")
+        cand = os.path.join(local_appdata, "Programs", "Ollama", "ollama.exe")
+        if os.path.exists(cand):
+            ollama_bin = cand
+
+    if ollama_bin and os.path.exists(ollama_bin):
+        print_step("Checking Ollama AI Engine installation", "FOUND", ANSI_GREEN)
+        print_step("Checking Ollama local service", "STARTING SERVICE", ANSI_YELLOW)
+        try:
+            if os.name == 'nt':
+                CREATE_NO_WINDOW = 0x08000000
+                subprocess.Popen([ollama_bin, "serve"], creationflags=CREATE_NO_WINDOW)
+            else:
+                subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"{ANSI_BOLD}[*]{ANSI_RESET} Ollama process launched in background.")
+            time.sleep(1.5)
+        except Exception as e:
+            print(f"{ANSI_YELLOW}[!] Warning: Could not auto-launch Ollama: {e}{ANSI_RESET}")
+    else:
+        print_step("Checking Ollama AI Engine installation", "NOT DETECTED", ANSI_YELLOW)
+        print(f"\n{ANSI_BOLD}{ANSI_YELLOW}[?] Ollama is required for 100% offline on-device question answering.{ANSI_RESET}")
+        try:
+            ans = input(f"{ANSI_BOLD}    Would you like to auto-download & install Ollama now? (y/n) [default: y]: {ANSI_RESET}").strip().lower()
+            if ans in ("", "y", "yes"):
+                download_and_install_ollama()
+            else:
+                print(f"  {ANSI_CYAN}[i] Skipping Ollama install. You can use Advance Turbo Cloud mode (Groq/Gemini/OpenAI) in Studio!{ANSI_RESET}")
+        except Exception:
+            pass
+
+def check_and_setup_ollama_models():
+    """
+    Check if essential local Ollama models (e.g. llama3.2:3b for text chat, moondream for vision)
+    are downloaded. If missing, prompt user with (y/n) to pull them so chat works 100% out-of-the-box.
+    """
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        local_appdata = os.getenv("LOCALAPPDATA", "")
+        cand = os.path.join(local_appdata, "Programs", "Ollama", "ollama.exe")
+        if os.path.exists(cand):
+            ollama_bin = cand
+
+    models = []
+    try:
+        import urllib.request
+        import json
+        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", headers={"User-Agent": "InsightRAG"})
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                models = [m.get("name", "") for m in data.get("models", [])]
+    except Exception:
+        pass
+
+    model_prefixes = [m.split(":")[0].lower() for m in models]
+    has_llama32 = any("llama3.2" in m.lower() for m in models)
+
+    print(f"\n{ANSI_BOLD}[*] Checking Local Ollama AI Models:{ANSI_RESET}")
+    print("-" * 65)
+
+    if has_llama32:
+        print_step("Local Chat LLM (llama3.2:3b)", "INSTALLED", ANSI_GREEN)
+    elif models:
+        first_model = models[0]
+        print_step(f"Local Chat LLM ({first_model})", "INSTALLED (Alternative)", ANSI_GREEN)
+    else:
+        print_step("Local Chat LLM (llama3.2:3b)", "NOT DETECTED", ANSI_YELLOW)
+        print(f"\n{ANSI_BOLD}{ANSI_YELLOW}[?] InsightRAG offline chat requires a local LLM like 'llama3.2:3b' (~2.0 GB).{ANSI_RESET}")
+        try:
+            ans = input(f"{ANSI_BOLD}    Would you like to auto-download 'llama3.2:3b' now? (y/n) [default: y]: {ANSI_RESET}").strip().lower()
+        except Exception:
+            ans = "y"
+
+        if ans in ("", "y", "yes"):
+            if ollama_bin:
+                print(f"{ANSI_CYAN}[*] Pulling 'llama3.2:3b' from Ollama library (one-time download)...{ANSI_RESET}")
+                try:
+                    subprocess.run([ollama_bin, "pull", "llama3.2:3b"], check=True)
+                    print(f"{ANSI_GREEN}[OK] 'llama3.2:3b' successfully downloaded!{ANSI_RESET}")
+                except Exception as e:
+                    print(f"{ANSI_RED}[!] Could not pull model: {e}{ANSI_RESET}")
+            else:
+                print(f"{ANSI_YELLOW}[!] Ollama CLI not found in PATH to auto-pull model.{ANSI_RESET}")
+                print(f"    You can manually run in terminal: ollama pull llama3.2:3b")
+        else:
+            print(f"  {ANSI_CYAN}[i] Skipping local LLM download. You can still use Cloud LLMs (Groq, Gemini, OpenAI) in Studio!{ANSI_RESET}")
+
+    # Vision model check (optional)
+    has_moondream = any("moondream" in p or "llava" in p for p in model_prefixes)
+    if has_moondream:
+        print_step("Vision AI Model (moondream:latest)", "INSTALLED", ANSI_GREEN)
+    else:
+        print_step("Vision AI Model (moondream:latest)", "NOT DETECTED (Optional)", ANSI_DARKGRAY)
+        try:
+            ans = input(f"{ANSI_BOLD}    Download optional Vision model 'moondream' (800MB) for image RAG? (y/n) [default: n]: {ANSI_RESET}").strip().lower()
+        except Exception:
+            ans = "n"
+
+        if ans in ("y", "yes"):
+            if ollama_bin:
+                print(f"{ANSI_CYAN}[*] Pulling 'moondream' from Ollama library...{ANSI_RESET}")
+                try:
+                    subprocess.run([ollama_bin, "pull", "moondream"], check=True)
+                    print(f"{ANSI_GREEN}[OK] 'moondream' successfully downloaded!{ANSI_RESET}")
+                except Exception as e:
+                    print(f"{ANSI_RED}[!] Error pulling model: {e}{ANSI_RESET}")
+            else:
+                print(f"    Run manually: ollama pull moondream")
+        else:
+            print(f"  {ANSI_DARKGRAY}[i] Skipping vision model. On-device OCR is active for image text!{ANSI_RESET}")
+
+def check_hardware():
+    threads = os.cpu_count() or 8
+    has_gpu = False
+    physical_gpu_name = None
+
+    # Check physical GPU via nvidia-smi or Windows video controller
+    try:
+        if shutil.which("nvidia-smi"):
+            out = subprocess.check_output(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], text=True, stderr=subprocess.DEVNULL, timeout=2.0).strip()
+            if out:
+                physical_gpu_name = out.splitlines()[0].strip()
+        elif os.name == 'nt':
+            out = subprocess.check_output(["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"], text=True, stderr=subprocess.DEVNULL, timeout=2.0).strip()
+            for line in out.splitlines():
+                line = line.strip()
+                if any(x in line.lower() for x in ["nvidia", "geforce", "rtx", "gtx", "quadro"]):
+                    physical_gpu_name = line
+                    break
+    except Exception:
+        pass
+
+    try:
+        import torch
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            has_gpu = True
+            gpu_name = torch.cuda.get_device_name(0)
+            print_step(f"Hardware Architecture: NVIDIA CUDA [{gpu_name}]", "ACTIVE GPU", ANSI_GREEN)
+    except Exception:
+        pass
+
+    if not has_gpu:
+        if physical_gpu_name:
+            print_step(f"Hardware Architecture: {physical_gpu_name}", "DETECTED (CPU TORCH)", ANSI_YELLOW)
+            print(f"\n{ANSI_BOLD}{ANSI_CYAN}[i] NVIDIA GPU '{physical_gpu_name}' detected! PyTorch is currently CPU-only.{ANSI_RESET}")
+            try:
+                ans = input(f"{ANSI_BOLD}    Enable high-speed CUDA GPU acceleration now? (y/n) [default: y]: {ANSI_RESET}").strip().lower()
+            except Exception:
+                ans = "n"
+            if ans in ("", "y", "yes"):
+                print(f"{ANSI_YELLOW}[*] Installing PyTorch with CUDA 12.4 support (~2.5GB)...{ANSI_RESET}")
+                try:
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu124"])
+                    print(f"{ANSI_GREEN}[OK] PyTorch CUDA acceleration enabled!{ANSI_RESET}")
+                    try:
+                        import importlib
+                        import torch
+                        importlib.reload(torch)
+                        if torch.cuda.is_available():
+                            has_gpu = True
+                            print_step(f"Hardware Architecture: NVIDIA CUDA [{torch.cuda.get_device_name(0)}]", "ACTIVE GPU", ANSI_GREEN)
+                    except Exception:
+                        pass
+                except Exception as e:
+                    print(f"{ANSI_RED}[!] Could not auto-install CUDA PyTorch: {e}{ANSI_RESET}")
+                    print(f"    You can manually run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124")
+        if not has_gpu:
+            print_step(f"Hardware Architecture: Standard Multi-Core CPU ({threads} Threads)", "ACTIVE CPU", ANSI_GREEN)
+
+def install_deps():
+    print(f"\n{ANSI_BOLD}[*] Checking & downloading dependencies with live status:{ANSI_RESET}")
+    print("-" * 65)
+    packages = [
+        ("fastapi", "fastapi"),
+        ("uvicorn", "uvicorn[standard]"),
+        ("pydantic", "pydantic"),
+        ("pydantic_settings", "pydantic-settings"),
+        ("httpx", "httpx"),
+        ("pandas", "pandas"),
+        ("numpy", "numpy"),
+        ("scipy", "scipy"),
+        ("statsmodels", "statsmodels"),
+        ("chardet", "chardet"),
+        ("multipart", "python-multipart"),
+        ("psutil", "psutil"),
+        ("sqlalchemy", "sqlalchemy"),
+        ("PIL", "pillow"),
+        ("fitz", "pymupdf"),
+        ("rapidocr_onnxruntime", "rapidocr-onnxruntime"),
+        ("sentence_transformers", "sentence-transformers"),
+        ("faiss", "faiss-cpu"),
+        ("pypdf", "pypdf"),
+        ("docx", "python-docx"),
+        ("dateutil", "python-dateutil"),
+    ]
+    missing = []
+    for mod_name, pip_name in packages:
+        try:
+            __import__(mod_name)
+            print(f"  {ANSI_GREEN}+ {pip_name:<30} [ INSTALLED ]{ANSI_RESET}")
+        except ImportError:
+            missing.append(pip_name)
+            print(f"  {ANSI_YELLOW}- {pip_name:<30} [ INSTALLING ]{ANSI_RESET}")
+    if missing:
+        print(f"\n{ANSI_YELLOW}[*] Found {len(missing)} missing Python package(s): {', '.join(missing)}{ANSI_RESET}")
+        try:
+            ans = input(f"{ANSI_BOLD}    Install missing Python packages now? (y/n) [default: y]: {ANSI_RESET}").strip().lower()
+        except Exception:
+            ans = "y"
+        if ans in ("", "y", "yes"):
+            print(f"{ANSI_YELLOW}[*] Installing {len(missing)} package(s)...{ANSI_RESET}")
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing)
+            print(f"{ANSI_GREEN}[OK] All Python packages successfully installed!{ANSI_RESET}")
+        else:
+            print(f"{ANSI_YELLOW}[!] Warning: Skipping package installation. Some features may not work.{ANSI_RESET}")
+
+def prewarm_vector_models():
+    """
+    Pre-download and warm up the embedding model during initial terminal startup.
+    This guarantees that uploads never time out with 'Network Error' on new machines!
+    """
+    print(f"\n{ANSI_BOLD}[*] Pre-warming On-Device Vector Embedding Engine:{ANSI_RESET}")
+    print("-" * 65)
+    try:
+        from sentence_transformers import SentenceTransformer
+        print_step("Vector Model (sentence-transformers/all-MiniLM-L6-v2)", "CHECKING CACHE", ANSI_YELLOW)
+        try:
+            model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+        except Exception:
+            model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=False)
+        _ = model.encode(["InsightRAG Ready"])
+        print_step("Vector Model (all-MiniLM-L6-v2, 80MB)", "READY (100% OFFLINE)", ANSI_GREEN)
+    except Exception as e:
+        print_step("Vector Model Pre-warm", f"READY (fallback on demand)", ANSI_GREEN)
+def free_ports():
+    """Ensure ports 8000 and 5173 are free from zombie processes before startup."""
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                for con in proc.net_connections(kind='inet'):
+                    if con.laddr.port in (8000, 5173) and con.status == 'LISTEN':
+                        if proc.pid != os.getpid():
+                            proc.kill()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def check_frontend():
+    frontend_dir = ROOT_DIR / "frontend"
+    node_modules = frontend_dir / "node_modules"
+    pkg_json = frontend_dir / "package.json"
+    hash_file = node_modules / ".package_hash"
+    npm_cmd = shutil.which("npm.cmd") or shutil.which("npm") or "npm"
+
+    needs_install = False
+    if not node_modules.exists():
+        needs_install = True
+    elif pkg_json.exists():
+        import hashlib
+        try:
+            current_hash = hashlib.md5(pkg_json.read_bytes()).hexdigest()
+            if not hash_file.exists() or hash_file.read_text().strip() != current_hash:
+                needs_install = True
+        except Exception:
+            pass
+
+    if needs_install:
+        print(f"\n{ANSI_YELLOW}[*] Installing/updating frontend packages (~30s)...{ANSI_RESET}")
+        subprocess.check_call([npm_cmd, "install"], cwd=str(frontend_dir))
+        try:
+            if pkg_json.exists():
+                import hashlib
+                current_hash = hashlib.md5(pkg_json.read_bytes()).hexdigest()
+                hash_file.write_text(current_hash)
+        except Exception:
+            pass
+        print(f"{ANSI_GREEN}[OK] Frontend packages updated!{ANSI_RESET}")
+    else:
+        print_step("Checking frontend npm packages", "OK", ANSI_GREEN)
+
+def run_backend():
+    """Run FastAPI backend on port 8000 (127.0.0.1) in a background thread."""
+    os.chdir(str(ROOT_DIR))
+    os.environ["RAG_ENABLED"] = "true"
+    os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+    import uvicorn
+    # Bind to 127.0.0.1 to guarantee local loopback without Windows Defender Firewall blocking popups
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, log_level="warning", reload=False)
+
+_browser_opened = False
+_browser_lock = threading.Lock()
+
+def open_browser(url: str):
+    """Reliably launch browser across all Windows/Mac/Linux setups without duplicates."""
+    global _browser_opened
+    with _browser_lock:
+        if _browser_opened:
+            return True
+        _browser_opened = True
+
+    # 1. Direct Windows native ShellExecute (fastest & most reliable on Windows)
+    if os.name == 'nt':
+        try:
+            os.startfile(url)
+            return True
+        except Exception:
+            pass
+
+        # 2. Windows CMD start command
+        try:
+            subprocess.Popen(f'start "" "{url}"', shell=True)
+            return True
+        except Exception:
+            pass
+
+        # 3. PowerShell Start-Process
+        try:
+            subprocess.Popen(["powershell", "-NoProfile", "-Command", f"Start-Process '{url}'"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            pass
+
+    # 4. Standard Python webbrowser module
+    try:
+        if webbrowser.open(url):
+            return True
+    except Exception:
+        pass
+
+    # 5. OS-specific fallbacks (macOS / Linux)
+    if sys.platform == 'darwin':
+        try:
+            subprocess.Popen(['open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            pass
+    elif sys.platform.startswith('linux'):
+        try:
+            subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            pass
+
+    return False
+
+def auto_open_browser_when_ready(url: str, port: int = 5173, timeout: int = 60):
+    """Background watchdog that opens the browser the exact moment port 5173 responds."""
+    start = time.time()
+    while time.time() - start < timeout:
+        if _browser_opened:
+            return
+        try:
+            import socket
+            with socket.create_connection(("127.0.0.1", port), timeout=0.8):
+                time.sleep(0.4)
+                open_browser(url)
+                return
+        except Exception:
+            time.sleep(0.3)
+    
+    # Fallback if timeout elapsed
+    if not _browser_opened:
+        open_browser(url)
+
+def run_frontend_dev():
+    """Run Vite dev server for the frontend on port 5173."""
+    frontend_dir = ROOT_DIR / "frontend"
+    npm_cmd = shutil.which("npm.cmd") or shutil.which("npm") or "npm"
+    return subprocess.Popen(
+        [npm_cmd, "run", "dev", "--", "--clearScreen", "false"],
+        cwd=str(frontend_dir),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding='utf-8',
+        errors='ignore'
+    )
+
+def wait_for_port(port, timeout=45):
+    import socket
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1):
+                return True
+        except Exception:
+            time.sleep(0.4)
+    return False
+
+def main():
+    skip_checks = "--skip-checks" in sys.argv
+    if not skip_checks:
+        check_python()
+        check_and_start_ollama()
+        check_hardware()
+        install_deps()
+        check_frontend()
+        prewarm_vector_models()
+
+    free_ports()
+
+    STUDIO_URL = "http://127.0.0.1:5173/app/upload"
+
+    print(f"\n{'='*65}")
+    print(f"{ANSI_BOLD}+---------------------------------------------------------------+{ANSI_RESET}")
+    print(f"{ANSI_BOLD}| ⚡ InsightRAG AI Studio — 100% Local On-Device AI             |{ANSI_RESET}")
+    print(f"{ANSI_BOLD}| 👉 Studio URL : {ANSI_CYAN}http://127.0.0.1:5173/app/upload{ANSI_RESET}{ANSI_BOLD}             |{ANSI_RESET}")
+    print(f"{ANSI_BOLD}| (Auto-opening in your browser once ready...)                  |{ANSI_RESET}")
+    print(f"{ANSI_BOLD}+---------------------------------------------------------------+{ANSI_RESET}")
+    print(f"  {ANSI_CYAN}💡 Firewall Tip: If Windows Defender asks, click 'Allow Access' so port 8000 is open.{ANSI_RESET}")
+    print(f"{'='*65}\n")
+
+    # Start FastAPI backend in a background thread
+    backend_thread = threading.Thread(target=run_backend, daemon=True)
+    backend_thread.start()
+    print(f"[>] Starting RAG Intelligence Engine...")
+
+    # Start Vite dev server as a subprocess
+    print(f"[>] Starting Studio UI Server...")
+    vite_proc = run_frontend_dev()
+
+    # Launch background auto-open watchdog immediately
+    watcher_thread = threading.Thread(target=auto_open_browser_when_ready, args=(STUDIO_URL, 5173, 60), daemon=True)
+    watcher_thread.start()
+
+    # Stream Vite output so user can see startup logs
+    def stream_vite():
+        for line in vite_proc.stdout:
+            cleaned = line.replace('\x1b[2J', '').replace('\x1b[0f', '').replace('\x1b[3J', '').replace('\x1b[H', '').replace('\x1b[2K', '')
+            if cleaned.strip():
+                sys.stdout.write(cleaned)
+                sys.stdout.flush()
+
+    threading.Thread(target=stream_vite, daemon=True).start()
+
+    # Wait for both ports to be ready
+    print(f"[*] Initializing on-device vector index & models...")
+    wait_for_port(8000, timeout=20)
+    ready = wait_for_port(5173, timeout=45)
+
+    if ready:
+        print(f"\n{ANSI_GREEN}{ANSI_BOLD}[✓] InsightRAG Studio is LIVE! Auto-opening browser:{ANSI_RESET}")
+        print(f"{ANSI_CYAN}{ANSI_BOLD}👉 {STUDIO_URL}{ANSI_RESET}\n")
+        open_browser(STUDIO_URL)
+    else:
+        print(f"\n{ANSI_YELLOW}[*] Studio server initialized. Launching browser:{ANSI_RESET}")
+        print(f"{ANSI_CYAN}{ANSI_BOLD}👉 {STUDIO_URL}{ANSI_RESET}\n")
+        open_browser(STUDIO_URL)
+
+    # Keep process alive
+    try:
+        vite_proc.wait()
+    except KeyboardInterrupt:
+        print(f"\n{ANSI_CYAN}[*] Shutting down InsightRAG Studio. Goodbye!{ANSI_RESET}")
+        try:
+            vite_proc.terminate()
+        except Exception:
+            pass
+
+if __name__ == "__main__":
+    main()

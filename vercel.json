@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "framework": null,
+  "installCommand": "cd frontend && npm install --legacy-peer-deps",
+  "buildCommand": "cd frontend && npx vite build --config vite.config.vercel.ts",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ]
+}

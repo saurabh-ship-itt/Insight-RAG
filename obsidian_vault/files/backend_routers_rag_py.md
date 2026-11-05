@@ -1,0 +1,39 @@
+---
+tags:
+  - #code
+  - #backend
+---
+# 📄 `rag.py`
+
+> **File Path**: `backend\routers\rag.py`
+> **Parent Hub**: [[05_FastAPI_Backend_Hub]] | **Master Hub**: [[00_Master_Hub]]
+
+---
+
+## 🔗 Connected Dependencies & Imported Modules
+- Main Subsystem Hub: [[05_FastAPI_Backend_Hub]]
+- Imported Module: [[files/src_rag_image_regions_py]]
+
+---
+
+## ⚙️ Key Symbols & Interfaces
+- `async def get_rag_stats`
+- `async def clear_rag_knowledge_base`
+- `async def delete_single_rag_document`
+- `async def upload_rag_documents`
+- `async def get_rag_ingestion_status`
+- `async def get_diagram_crop`
+- `async def query_rag`
+- `async def submit_rag_feedback`
+- `async def query_rag_stream`
+- `async def sse_event_generator`
+
+---
+
+## 💬 Token-Saving AI Summary
+```text
+Module: backend\routers\rag.py (579 lines)
+Tags: #code, #backend
+Hub: 05_FastAPI_Backend_Hub
+Exports: async def get_rag_stats, async def clear_rag_knowledge_base, async def delete_single_rag_document, async def upload_rag_documents, async def get_rag_ingestion_status
+```

@@ -1,0 +1,448 @@
+import axios from "axios";
+import { auth } from "../lib/firebase";
+import type {
+  DatasetListResponse,
+  AnomalyListResponse,
+  AnomalyDetail,
+  UploadResponse,
+  Dataset,
+} from "../types/backend-types";
+
+export const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined") {
+    const { hostname, port } = window.location;
+    // When running under Vite dev server (port 5173), proxy directly to backend
+    if (port === "5173") {
+      return "/api/v1";
+    }
+    // When served directly by FastAPI (port 8000), use same-origin relative path
+    if (port === "8000") {
+      return "/api/v1";
+    }
+    // If local loopback on another port, use IPv4 127.0.0.1 to avoid Windows 11 ::1 resolution failure
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://127.0.0.1:8000/api/v1";
+    }
+    // In production web deployment (e.g. on Vercel), use relative API path routed to backend service
+    return "/api/v1";
+  }
+  // Server-side runtime / SSR / Functions: use internal Vercel service binding if available
+  if (typeof process !== "undefined" && process?.env?.BACKEND_URL) {
+    const bound = process.env.BACKEND_URL.replace(/\/+$/, "");
+    return `${bound}/api/v1`;
+  }
+  return "http://127.0.0.1:8000/api/v1";
+};
+
+export const API_BASE = getApiBase();
+
+const api = axios.create({
+  baseURL: API_BASE,
+  timeout: 120000, // 2 minute timeout — embedding generation & Ollama inference need time
+});
+
+// Attach Firebase ID Token automatically to all outgoing backend requests
+api.interceptors.request.use(async (config) => {
+  try {
+    const currentUser = auth?.currentUser;
+    if (currentUser) {
+      const token = await currentUser.getIdToken();
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (err) {
+    console.warn("Failed to attach Firebase token to request", err);
+  }
+  return config;
+});
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const { data } = await api.get("/health", { timeout: 3000 });
+    return Boolean(data && data.status === "ok");
+  } catch {
+    return false;
+  }
+}
+
+// ─── Datasets ───
+
+export async function uploadDataset(
+  file: File,
+  name?: string,
+  timeColumn?: string,
+  dimensions?: string,
+): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (name) formData.append("name", name);
+  if (timeColumn) formData.append("time_column", timeColumn);
+  if (dimensions) formData.append("dimensions", dimensions);
+
+  const { data } = await api.post("/datasets/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function getDatasets(
+  page = 1,
+  perPage = 20,
+  status?: string,
+): Promise<DatasetListResponse> {
+  try {
+    const params: Record<string, any> = { page, per_page: perPage };
+    if (status) params.status = status;
+    const { data } = await api.get("/datasets", { params });
+    return data;
+  } catch (err) {
+    return { datasets: [], total: 0, page: 1, per_page: perPage } as any;
+  }
+}
+
+export async function getDataset(id: string): Promise<Dataset> {
+  const { data } = await api.get(`/datasets/${id}`);
+  return data;
+}
+
+export async function deleteDataset(id: string): Promise<void> {
+  await api.delete(`/datasets/${id}`);
+}
+
+// ─── Anomalies ───
+
+export async function getAnomalies(
+  datasetId: string,
+  params?: {
+    severity_min?: number;
+    anomaly_type?: string;
+    metric?: string;
+    page?: number;
+    per_page?: number;
+  },
+): Promise<AnomalyListResponse> {
+  try {
+    const { data } = await api.get(`/datasets/${datasetId}/anomalies`, { params });
+    return data;
+  } catch (err) {
+    return { anomalies: [], total: 0, page: 1, per_page: 20 } as any;
+  }
+}
+
+export async function getAnomalyDetail(anomalyId: string): Promise<AnomalyDetail> {
+  const { data } = await api.get(`/anomalies/${anomalyId}`);
+  return data;
+}
+
+// ─── Health ───
+
+export async function checkHealth(): Promise<any> {
+  try {
+    const { data } = await api.get("/health");
+    return data;
+  } catch (err) {
+    return { status: "offline", rag_enabled: false };
+  }
+}
+
+// ─── RAG Query & Upload ───
+
+export interface RAGTaskStatus {
+  task_id: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  step: number;
+  stage: string;
+  progress: number;
+  message: string;
+  error_message?: string | null;
+  files: string[];
+  documents_ingested: number;
+  chunks_created: number;
+  errors: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getRAGTaskStatus(taskId: string): Promise<RAGTaskStatus> {
+  const { data } = await api.get(`/rag/documents/${encodeURIComponent(taskId)}/status`, {
+    timeout: 10000,
+  });
+  return data;
+}
+
+export async function uploadRAGDocuments(
+  files: File[],
+  startPage?: number,
+  endPage?: number,
+): Promise<any> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  if (startPage !== undefined && startPage !== null && !isNaN(startPage)) {
+    formData.append("start_page", startPage.toString());
+  }
+  if (endPage !== undefined && endPage !== null && !isNaN(endPage)) {
+    formData.append("end_page", endPage.toString());
+  }
+  const { data } = await api.post("/rag/documents", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000, // Upload returns immediately now
+  });
+  return data;
+}
+
+export async function queryRAG(
+  query: string,
+  topK = 5,
+  minScore = 0.0,
+  model = "llama3.2:3b",
+  processingMode = "local",
+  apiKey?: string,
+  history?: Array<{ role: string; text?: string; content?: string }>,
+): Promise<any> {
+  const { data } = await api.post(
+    "/rag/query",
+    {
+      query,
+      top_k: topK,
+      min_score: minScore,
+      model,
+      generate_answer: true,
+      processing_mode: processingMode,
+      api_key: apiKey,
+      history: history || [],
+    },
+    {
+      timeout: 120000, // 2 minutes for vector search + inference
+    },
+  );
+  return data;
+}
+
+export async function getRAGStats(): Promise<any> {
+  try {
+    const { data } = await api.get("/rag/stats");
+    return data;
+  } catch (err) {
+    return { total_vectors: 0, files: [] };
+  }
+}
+
+export async function clearRAGKnowledgeBase(): Promise<any> {
+  const { data } = await api.post("/rag/clear");
+  return data;
+}
+
+export async function deleteRAGDocument(docName: string): Promise<any> {
+  const { data } = await api.delete(`/rag/documents/${encodeURIComponent(docName)}`);
+  return data;
+}
+
+export async function getSystemSpecs(): Promise<any> {
+  try {
+    const { data } = await api.get("/system/specs");
+    return data;
+  } catch (err) {
+    return {
+      cpu_threads: 12,
+      ram_gb: 15.4,
+      gpu_name: "Integrated / CPU",
+      vram_gb: 0.0,
+      has_gpu: false,
+      acceleration_mode: "CPU PARALLEL ENGINE",
+      ollama_running: true,
+      installed_models: ["llama3.2:3b"],
+    };
+  }
+}
+
+export async function pullModel(modelName: string): Promise<any> {
+  const { data } = await api.post("/system/pull-model", { model_name: modelName });
+  return data;
+}
+
+export async function listInstalledModels(): Promise<{ installed_models: string[]; models: any[]; ollama_running: boolean }> {
+  try {
+    const { data } = await api.get("/system/models");
+    return data;
+  } catch {
+    return { installed_models: [], models: [], ollama_running: false };
+  }
+}
+
+export interface PullModelCallbacks {
+  onProgress?: (pct: number, status: string) => void;
+  onDone?: () => void;
+  onError?: (error: string) => void;
+}
+
+export async function streamPullModel(
+  modelName: string,
+  callbacks?: PullModelCallbacks
+): Promise<void> {
+  const url = `${API_BASE}/system/pull-model`;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_name: modelName }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Pull failed with HTTP ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error("No response stream received.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+          if (data.status === "error") {
+            callbacks?.onError?.(data.message || "Failed to pull model");
+            return;
+          }
+          const pct = typeof data.percent === "number" ? data.percent : 0;
+          const status = data.status || "Downloading...";
+          callbacks?.onProgress?.(pct, status);
+        } catch {
+          // ignore non-json chunk
+        }
+      }
+    }
+
+    callbacks?.onDone?.();
+  } catch (err: any) {
+    callbacks?.onError?.(err?.message || "Failed to download model.");
+  }
+}
+
+export async function setHardwareMode(mode: "gpu" | "cpu"): Promise<any> {
+  const { data } = await api.post("/system/hardware-mode", { mode });
+  return data;
+}
+
+export async function getHardwareMode(): Promise<any> {
+  const { data } = await api.get("/system/hardware-mode");
+  return data;
+}
+
+// ─── SSE Streaming RAG Query ───
+
+export interface StreamCallbacks {
+  onToken: (token: string) => void;
+  onMetadata: (data: any) => void;
+  onDone: (data: any) => void;
+  onError: (error: string) => void;
+}
+
+export async function streamRAGQuery(
+  query: string,
+  topK = 5,
+  minScore = 0.0,
+  model = "llama3.2:3b",
+  processingMode = "local",
+  apiKey?: string,
+  history?: Array<{ role: string; text?: string; content?: string }>,
+  callbacks?: StreamCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const url = `${API_BASE}/rag/query/stream`;
+  const body = {
+    query,
+    top_k: topK,
+    min_score: minScore,
+    model,
+    generate_answer: true,
+    processing_mode: processingMode,
+    api_key: apiKey,
+    history: history || [],
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!response.ok) {
+      callbacks?.onError(`Server error: ${response.status}`);
+      return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      callbacks?.onError("No stream reader available");
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        if (signal?.aborted) {
+          callbacks?.onDone?.({});
+          return;
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        let currentEvent = "message";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+            try {
+              const parsed = JSON.parse(raw);
+              if (currentEvent === "token") {
+                callbacks?.onToken(parsed.token || "");
+              } else if (currentEvent === "metadata") {
+                callbacks?.onMetadata(parsed);
+              } else if (currentEvent === "done") {
+                callbacks?.onDone(parsed);
+              } else if (currentEvent === "error") {
+                callbacks?.onError(parsed.error || "Stream error");
+              }
+            } catch {
+              // skip malformed JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError" || signal?.aborted) {
+      callbacks?.onDone?.({});
+      return;
+    }
+    callbacks?.onError(err?.message || "Stream error");
+  }
+}
+
+export default api;
