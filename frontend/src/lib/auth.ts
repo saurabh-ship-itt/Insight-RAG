@@ -23,3 +23,4 @@ export const defaultUser: LocalUser = {
 export const auth = {
   currentUser: defaultUser,
 };
+

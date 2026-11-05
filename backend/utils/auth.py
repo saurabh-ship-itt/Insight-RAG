@@ -84,3 +84,4 @@ async def require_admin(
             detail="Forbidden: Administrative privileges required to access this resource.",
         )
     return user
+
