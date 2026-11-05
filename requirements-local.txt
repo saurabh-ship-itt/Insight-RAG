@@ -1,0 +1,42 @@
+# InsightRAG - Complete Full Local Dependencies (Includes Offline Embeddings & FAISS)
+# Use this file for complete offline local RAG with local embedding models.
+
+# Web Framework & Backend
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+statsmodels>=0.14.0
+
+# Core data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Data validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Database
+sqlalchemy>=2.0.0
+
+# Storage
+boto3>=1.28.0
+
+# Date parsing & encoding
+python-dateutil>=2.8.0
+chardet>=5.0.0
+
+# Statistical operations
+scipy>=1.10.0
+
+# Multimodal RAG & Embeddings (Heavy ML ~800MB+ PyTorch)
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4; platform_system != "Darwin"
+pypdf>=3.0.0
+pdfminer.six>=20221105; python_version >= "3.9"
+
+# Testing & Dev
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+structlog>=23.0.0
