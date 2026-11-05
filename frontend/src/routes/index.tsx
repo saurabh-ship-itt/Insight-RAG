@@ -199,15 +199,17 @@ function LandingPage() {
               </a>
             </nav>
 
-            {/* Top Right Action Button - User Auth / Sign In */}
+            {/* Top Right Action Button - GitHub */}
             <div className="flex items-center gap-2 z-10">
-              <Link
-                to="/app/upload"
+              <a
+                href="https://github.com/saurabh-ship-itt/Insight-RAG"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="bg-[#ffe600] text-black hover:bg-yellow-400 font-mono font-black text-[11px] sm:text-xs px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] shrink-0"
               >
-                <Sparkles className="w-3.5 h-3.5 text-black" />
-                <span>LAUNCH STUDIO</span>
-              </Link>
+                <Code className="w-3.5 h-3.5 text-black" />
+                <span>GITHUB</span>
+              </a>
             </div>
           </div>
 

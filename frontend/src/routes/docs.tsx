@@ -494,10 +494,10 @@ function DocsPage() {
                       </button>
                     ) : (
                       <Link
-                        to="/app/upload"
+                        to="/"
                         className="flex items-center gap-2 font-mono text-xs font-black text-white border-2 border-black px-5 py-2.5 rounded-xl bg-black hover:bg-gray-800 shadow-[2px_2px_0px_#000] transition active:scale-95 ml-auto"
                       >
-                        <span>Launch Live Studio</span>
+                        <span>Return to Overview</span>
                         <ArrowRight className="w-4 h-4 text-[#ffe600]" />
                       </Link>
                     )}

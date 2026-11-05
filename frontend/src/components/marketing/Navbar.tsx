@@ -46,14 +46,16 @@ export function Navbar() {
 
         {/* Action Buttons & Mobile Hamburger Toggle */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Studio Link for direct instant access */}
-          <Link
-            to="/app/upload"
-            className="inline-flex items-center gap-1.5 bg-[#ffe600] text-black font-mono font-black text-xs px-3.5 py-2 rounded-lg border border-black hover:bg-yellow-400 transition active:scale-95 cursor-pointer"
+          {/* GitHub Repo Link */}
+          <a
+            href="https://github.com/saurabh-ship-itt/Insight-RAG"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 bg-white/10 text-white font-mono font-bold text-xs px-3.5 py-2 rounded-lg border border-white/20 hover:bg-white/20 transition active:scale-95 cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-black" />
-            <span>Launch Studio</span>
-          </Link>
+            <BookOpen className="w-3.5 h-3.5 text-[#ffe600]" />
+            <span>GitHub</span>
+          </a>
 
           {/* Desktop App Download CTA */}
           <a
@@ -104,14 +106,16 @@ export function Navbar() {
           </div>
 
           <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
-            <Link
-              to="/app/upload"
+            <a
+              href="https://github.com/saurabh-ship-itt/Insight-RAG"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full flex items-center justify-center gap-2 bg-[#ffe600] text-black font-mono font-black text-xs py-2.5 rounded-lg border border-black shadow-[2px_2px_0px_#000] active:scale-98"
             >
-              <Sparkles className="w-4 h-4 text-black" />
-              <span>Launch Local Studio Workspace</span>
-            </Link>
+              <BookOpen className="w-4 h-4 text-black" />
+              <span>View on GitHub</span>
+            </a>
 
             <Link
               to="/docs"
