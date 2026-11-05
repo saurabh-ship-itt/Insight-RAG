@@ -1,5 +1,5 @@
 import axios from "axios";
-import { auth } from "../lib/firebase";
+import { auth } from "../lib/auth";
 import type {
   DatasetListResponse,
   AnomalyListResponse,
@@ -42,7 +42,7 @@ const api = axios.create({
   timeout: 120000, // 2 minute timeout — embedding generation & Ollama inference need time
 });
 
-// Attach Firebase ID Token automatically to all outgoing backend requests
+// Attach Auth ID Token automatically to all outgoing backend requests
 api.interceptors.request.use(async (config) => {
   try {
     const currentUser = auth?.currentUser;
@@ -52,7 +52,7 @@ api.interceptors.request.use(async (config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch (err) {
-    console.warn("Failed to attach Firebase token to request", err);
+    console.warn("Failed to attach auth token to request", err);
   }
   return config;
 });

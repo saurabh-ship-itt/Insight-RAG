@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { defaultUser, type LocalUser } from "./firebase";
+import { defaultUser, type LocalUser } from "./auth";
 import { API_BASE } from "../services/api";
 
 export type { LocalUser as User };

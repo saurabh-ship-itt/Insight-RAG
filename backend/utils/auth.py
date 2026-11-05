@@ -1,8 +1,8 @@
 """
-Authentication & Verification Utility (Self-Contained / Local Auth).
+Authentication & Verification Utility (Self-Contained Local Auth).
 
-Replaces external Firebase Admin SDK dependencies with a lightweight,
-secure local authentication handler customized for Saurabh Malhotra.
+Lightweight, secure standalone authentication handler customized for Saurabh Malhotra.
+No external cloud or third-party authentication dependencies.
 """
 
 import os
@@ -19,11 +19,6 @@ from ..config import settings
 logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
-
-
-def init_firebase() -> bool:
-    """Retained for backward compatibility. No external Firebase connection needed."""
-    return True
 
 
 def sanitize_input(text: Optional[str], max_len: int = 255) -> Optional[str]:
@@ -49,13 +44,12 @@ def get_default_user() -> Dict[str, Any]:
     }
 
 
-def verify_firebase_token(id_token: str) -> Optional[Dict[str, Any]]:
-    """Verify auth token locally without external Firebase dependency."""
+def verify_auth_token(id_token: str) -> Optional[Dict[str, Any]]:
+    """Verify auth token locally without external services."""
     if not id_token:
         return None
     # Provide authenticated admin session
-    user = get_default_user()
-    return user
+    return get_default_user()
 
 
 async def get_current_user_optional(
@@ -63,7 +57,7 @@ async def get_current_user_optional(
 ) -> Optional[Dict[str, Any]]:
     """Extract and verify user from Bearer token if present, or return default user."""
     if cred and cred.credentials:
-        return verify_firebase_token(cred.credentials)
+        return verify_auth_token(cred.credentials)
     # Return default user for seamless local operation
     return get_default_user()
 

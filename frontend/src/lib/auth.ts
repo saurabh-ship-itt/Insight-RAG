@@ -1,4 +1,4 @@
-// Local auth & client configuration replacing external Firebase
+// Local standalone auth & client configuration for Saurabh Malhotra
 
 export interface LocalUser {
   uid: string;
@@ -23,11 +23,3 @@ export const defaultUser: LocalUser = {
 export const auth = {
   currentUser: defaultUser,
 };
-
-export const googleProvider = {
-  setCustomParameters: () => {},
-};
-
-export const analytics = null;
-export const app = null;
-export const firebaseConfig = {};

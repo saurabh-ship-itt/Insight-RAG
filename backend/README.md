@@ -35,7 +35,7 @@ backend/
 │   └── file_store.py     # Local disk file storage & path resolution
 │
 └── utils/                # 🛡️ Security & Authentication Utilities
-    ├── firebase_auth.py  # Local authentication verification & admin RBAC check
+    ├── auth.py         # Local authentication verification & admin RBAC check
     ├── rate_limiter.py   # Sliding-window in-memory anti-DoS & brute-force rate limiter
     └── security.py       # Path traversal validation & safe filename sanitization
 ```
@@ -45,7 +45,7 @@ backend/
 ## 🚀 Key Workflows
 
 ### 1. Authentication & Security Flow
-1. **Token Ingestion**: Incoming requests with `Authorization: Bearer <auth_token>` are decoded by [`firebase_auth.py`](utils/firebase_auth.py).
+1. **Token Ingestion**: Incoming requests with `Authorization: Bearer <auth_token>` are decoded by [`auth.py`](utils/auth.py).
 2. **Admin Validation**: Endpoints like `GET /api/v1/auth/logs` invoke `require_admin` to restrict access strictly to whitelisted admin emails in [`config.py`](config.py).
 3. **Audit Logging**: Every login, dataset upload, and RAG query creates an entry in `user_access_logs` in SQLite via [`database.py`](storage/database.py).
 

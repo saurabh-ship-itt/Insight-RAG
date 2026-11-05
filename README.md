@@ -229,7 +229,7 @@ InsightRAG/
 │   │   ├── database.py                   # SQLAlchemy ORM (datasets, anomalies, user_access_logs)
 │   │   └── file_store.py                 # Multi-format local disk & cloud file storage handler
 │   └── utils/                            # Security, Rate Limiting & Auth Hardening
-│       ├── firebase_auth.py              # Firebase Admin SDK, ID token verification & admin RBAC
+│       ├── auth.py                   # Local session verification & admin RBAC
 │       ├── rate_limiter.py               # In-memory sliding-window anti-DoS & brute-force protection
 │       └── security.py                   # Path traversal protection & safe filename sanitization
 │
@@ -256,7 +256,7 @@ InsightRAG/
 │   │   │   ├── premium/                  # Ambient backgrounds, glass cards & glow badges
 │   │   │   └── ui/                       # Accessible Shadcn/UI primitives (buttons, modals, dialogs)
 │   │   ├── lib/                          # Core Client Utilities & State
-│   │   │   ├── firebase.ts               # Firebase Web SDK initialization & Google Analytics
+│   │   │   ├── auth.ts                   # Local standalone auth configuration
 │   │   │   ├── auth-context.tsx          # User auth lifecycle, login/logout & token synchronization
 │   │   │   └── utils.ts                  # ClassName merging (`clsx` + `tailwind-merge`)
 │   │   ├── services/                     # HTTP API Client

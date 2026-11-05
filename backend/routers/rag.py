@@ -14,7 +14,7 @@ from typing import Dict, Any
 from ..dependencies import get_rag_service
 from ..models.requests import RAGQueryRequest, RAGFeedbackRequest
 from ..models.responses import RAGQueryResponse, RAGUploadResponse, RAGTaskStatusResponse
-from ..utils.firebase_auth import get_current_user_optional
+from ..utils.auth import get_current_user_optional
 from ..storage.database import get_session, UserAccessLogRecord
 
 logger = logging.getLogger(__name__)

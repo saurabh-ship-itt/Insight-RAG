@@ -32,7 +32,7 @@ frontend/src/
 │   └── ui/               # Accessible Shadcn/UI primitives (buttons, dialogs, tabs)
 │
 ├── lib/                  # 🛠️ Core Utilities & Contexts
-│   ├── firebase.ts       # Local Auth configuration
+│   ├── auth.ts         # Local Auth configuration
 │   ├── auth-context.tsx  # User auth lifecycle, login/logout & backend sync
 │   └── utils.ts          # ClassName merging (`clsx` + `tailwind-merge`)
 │

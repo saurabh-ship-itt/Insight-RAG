@@ -18,7 +18,7 @@ from ..models.responses import (
     UploadResponse,
     ColumnSchemaResponse,
 )
-from ..utils.firebase_auth import get_current_user_optional
+from ..utils.auth import get_current_user_optional
 from ..storage.database import get_session, UserAccessLogRecord
 
 logger = logging.getLogger(__name__)

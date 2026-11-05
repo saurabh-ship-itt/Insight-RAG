@@ -1,7 +1,7 @@
 """
 Authentication & User Access Audit Router.
 
-Tracks logins, access logs, and user identity via Firebase.
+Tracks logins, access logs, and user identity via local session management.
 """
 
 import logging
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
 from ..storage.database import get_session, UserAccessLogRecord
-from ..utils.firebase_auth import (
+from ..utils.auth import (
     get_current_user_optional,
     get_current_user_required,
     require_admin,
