@@ -20,16 +20,35 @@ SRC_DIR = str(Path(__file__).resolve().parent.parent.parent / "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from detection.detector import AnomalyDetector
-from detection.models import DetectionConfig, Anomaly
-from root_cause.analyzer import RootCauseAnalyzer
-from explainer.generator import ExplanationGenerator
-from explainer.models import (
-    ExplanationConfig,
-    ExplanationRequest,
-    AnomalyContext,
-    RootCauseContext,
-)
+# Heavy ML/src modules — gracefully degrade if not available (e.g. on Vercel)
+_ANALYSIS_AVAILABLE = False
+AnomalyDetector = None
+DetectionConfig = None
+Anomaly = None
+RootCauseAnalyzer = None
+ExplanationGenerator = None
+ExplanationConfig = None
+ExplanationRequest = None
+AnomalyContext = None
+RootCauseContext = None
+
+try:
+    from detection.detector import AnomalyDetector
+    from detection.models import DetectionConfig, Anomaly
+    from root_cause.analyzer import RootCauseAnalyzer
+    from explainer.generator import ExplanationGenerator
+    from explainer.models import (
+        ExplanationConfig,
+        ExplanationRequest,
+        AnomalyContext,
+        RootCauseContext,
+    )
+    _ANALYSIS_AVAILABLE = True
+except ImportError as e:
+    logging.getLogger(__name__).warning(
+        f"Heavy analysis modules not available (expected on Vercel): {e}. "
+        "Anomaly detection features disabled."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +63,19 @@ class AnalysisService:
 
     def __init__(
         self,
-        detection_config: Optional[DetectionConfig] = None,
-        explanation_config: Optional[ExplanationConfig] = None,
+        detection_config=None,
+        explanation_config=None,
     ):
-        self.detector = AnomalyDetector(detection_config or DetectionConfig())
-        self.root_cause_analyzer = RootCauseAnalyzer()
-        self.explainer = ExplanationGenerator(explanation_config or ExplanationConfig())
+        if _ANALYSIS_AVAILABLE:
+            self.detector = AnomalyDetector(detection_config or DetectionConfig())
+            self.root_cause_analyzer = RootCauseAnalyzer()
+            self.explainer = ExplanationGenerator(explanation_config or ExplanationConfig())
+        else:
+            self.detector = None
+            self.root_cause_analyzer = None
+            self.explainer = None
 
-        logger.info("AnalysisService initialized")
+        logger.info("AnalysisService initialized (available=%s)", _ANALYSIS_AVAILABLE)
 
     def run_full_analysis(
         self,
@@ -61,19 +85,15 @@ class AnalysisService:
         metric_columns: Optional[List[str]] = None,
         dimensions: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """
-        Run the complete analysis pipeline on a DataFrame.
+        """Run the complete analysis pipeline on a DataFrame."""
+        if not _ANALYSIS_AVAILABLE or self.detector is None:
+            return {
+                "anomalies": [],
+                "root_causes": [],
+                "explanations": [],
+                "summary": {"total_anomalies": 0, "note": "Analysis engine not available in this environment."},
+            }
 
-        Args:
-            df: Loaded DataFrame
-            dataset_id: Dataset ID
-            time_column: Time column name (auto-detect if None)
-            metric_columns: Metric columns (auto-detect if None)
-            dimensions: Categorical dimension columns
-
-        Returns:
-            Dict with anomalies, root_causes, and explanations
-        """
         logger.info(f"Starting full analysis for dataset {dataset_id} ({len(df)} rows)")
 
         # Auto-detect time column if not provided

@@ -4,6 +4,7 @@ Database setup and models.
 SQLAlchemy ORM with SQLite for metadata storage.
 """
 
+import os
 import uuid
 from datetime import datetime
 
